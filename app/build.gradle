@@ -1,0 +1,33 @@
+plugins {
+    id "com.android.application"
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+def aiBackendBaseUrl = localProperties.getProperty("AI_BACKEND_BASE_URL", "http://10.0.2.2:8787")
+
+android {
+    namespace "com.sotaynauan.ai"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.sotaynauan.ai"
+        minSdk 23
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+        buildConfigField "String", "AI_BACKEND_BASE_URL", "\"${aiBackendBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+}
+
+dependencies {
+    implementation "androidx.room:room-runtime:2.6.1"
+    annotationProcessor "androidx.room:room-compiler:2.6.1"
+}

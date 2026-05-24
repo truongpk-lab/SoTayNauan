@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_splash">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp">
+
+        <FrameLayout
+            android:id="@+id/splashLogo"
+            android:layout_width="160dp"
+            android:layout_height="160dp"
+            android:alpha="0"
+            android:background="@drawable/bg_logo_plate">
+
+            <ImageView
+                android:layout_width="104dp"
+                android:layout_height="104dp"
+                android:layout_gravity="center"
+                android:contentDescription="@string/app_name"
+                android:src="@drawable/ic_cooking_mark" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/splashTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:alpha="0"
+            android:gravity="center"
+            android:text="@string/app_name"
+            android:textColor="@color/primary"
+            android:textSize="32sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/splashSubtitle"
+            android:layout_width="280dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:alpha="0"
+            android:gravity="center"
+            android:lineSpacingExtra="2dp"
+            android:text="@string/splash_tagline"
+            android:textColor="@color/on_surface_variant"
+            android:textSize="18sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/loadingDots"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="48dp"
+        android:alpha="0"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="16dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="•"
+            android:textColor="@color/primary"
+            android:textSize="28sp" />
+
+        <TextView
+            android:layout_width="16dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="•"
+            android:textColor="@color/primary_container"
+            android:textSize="28sp" />
+
+        <TextView
+            android:layout_width="16dp"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="•"
+            android:textColor="@color/primary"
+            android:textSize="28sp" />
+    </LinearLayout>
+</FrameLayout>

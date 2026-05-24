@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="114dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="70dp"
+                android:background="@color/background"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp">
+
+                <TextView
+                    android:id="@+id/menuButton"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:gravity="center"
+                    android:text="☰"
+                    android:textColor="@color/on_surface"
+                    android:textSize="28sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:text="@string/app_name"
+                    android:textColor="@color/primary"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:background="@drawable/bg_home_tab_active"
+                    android:gravity="center"
+                    android:text="👩"
+                    android:textSize="20sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="26dp"
+                android:paddingTop="46dp"
+                android:paddingEnd="26dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="bottom"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:lineSpacingExtra="2dp"
+                        android:text="Danh sách đi chợ"
+                        android:textColor="@color/on_surface"
+                        android:textSize="36sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/bg_home_tab_active"
+                            android:gravity="center"
+                            android:text="A"
+                            android:textColor="@color/on_primary_container"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:layout_marginStart="-10dp"
+                            android:background="@drawable/bg_home_tab_active"
+                            android:gravity="center"
+                            android:text="M"
+                            android:textColor="@color/on_primary_container"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/addMemberButton"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:layout_marginStart="-10dp"
+                            android:background="@drawable/bg_shopping_primary"
+                            android:gravity="center"
+                            android:text="+"
+                            android:textColor="@color/on_primary"
+                            android:textSize="22sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/shoppingModeButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="64dp"
+                    android:layout_marginTop="30dp"
+                    android:background="@drawable/bg_shopping_primary"
+                    android:text="🏃  Bật Chế độ đi chợ"
+                    android:textAllCaps="false"
+                    android:textColor="@color/on_primary"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/listSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:background="@drawable/bg_shopping_summary"
+                    android:lineSpacingExtra="2dp"
+                    android:padding="16dp"
+                    android:textColor="@color/primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/listFilterContainer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
+
+                <LinearLayout
+                    android:id="@+id/shoppingListContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <TextView
+                    android:id="@+id/emptyListText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="34dp"
+                    android:background="@drawable/bg_soft_panel"
+                    android:gravity="center"
+                    android:lineSpacingExtra="3dp"
+                    android:padding="24dp"
+                    android:text="Danh sách đang trống. Hãy tạo từ kế hoạch đi chợ hoặc thêm nguyên liệu mới."
+                    android:textColor="@color/on_surface_variant"
+                    android:textSize="16sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="96dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_bottom_nav"
+        android:elevation="14dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp">
+
+        <TextView
+            android:id="@+id/homeTab"
+            style="@style/HomeBottomTab"
+            android:text="@string/tab_home" />
+
+        <TextView
+            android:id="@+id/searchTab"
+            style="@style/HomeBottomTab"
+            android:text="@string/tab_search" />
+
+        <TextView
+            android:id="@+id/aiChefTab"
+            style="@style/HomeBottomTab"
+            android:text="@string/tab_ai_chef" />
+
+        <TextView
+            android:id="@+id/shoppingTab"
+            style="@style/HomeBottomTabActive"
+            android:text="@string/tab_shopping" />
+
+        <TextView
+            android:id="@+id/profileTab"
+            style="@style/HomeBottomTab"
+            android:text="@string/tab_profile" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/addItemButton"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="26dp"
+        android:layout_marginBottom="112dp"
+        android:background="@drawable/bg_shopping_primary"
+        android:text="+"
+        android:textColor="@color/on_primary"
+        android:textSize="26sp"
+        android:textStyle="bold" />
+</FrameLayout>

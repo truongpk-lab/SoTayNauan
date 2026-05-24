@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:label="@string/app_name"
+        android:roundIcon="@drawable/ic_launcher_foreground"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <activity
+            android:name=".ui.profile.ProfileActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.community.CommunityActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.voice.VoiceSettingsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.voice.VoiceAssistantActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.shopping.ShoppingListActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.shopping.ShoppingPlanActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.cooking.CookingTimerDoneActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.cooking.CookingTimerActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.cooking.CookingModeActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.recipe.RecipeDetailActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.ai.MatchDetailActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.ai.AiRecipeSuggestionActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.ai.IngredientConfirmActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.ai.IngredientInputActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.home.HomeActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.ai.AiFlowActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.ai.AiChefActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.home.RecipePreviewActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.auth.LoginActivity"
+            android:exported="false" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

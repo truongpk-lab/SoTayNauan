@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="28dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/cookingBackButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:gravity="center"
+                android:text="×"
+                android:textColor="@color/on_surface_variant"
+                android:textSize="36sp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="Chế độ nấu"
+                android:textColor="@color/primary"
+                android:textSize="27sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/cookingReplayTopButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_cooking_icon_button"
+                android:gravity="center"
+                android:text="♪"
+                android:textColor="@color/on_surface_variant"
+                android:textSize="25sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/cookingAskTopButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_cooking_mic_button"
+                android:gravity="center"
+                android:text="🎙"
+                android:textColor="@color/on_primary_container"
+                android:textSize="22sp" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/cookingPhotoFrame"
+            android:layout_width="match_parent"
+            android:layout_height="192dp"
+            android:layout_marginTop="92dp"
+            android:background="@drawable/bg_cooking_photo"
+            android:clipToOutline="true">
+
+            <ImageView
+                android:id="@+id/cookingStepPhoto"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/app_name"
+                android:scaleType="centerCrop"
+                android:src="@drawable/cooking_step_preview" />
+
+            <TextView
+                android:id="@+id/cookingStepBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:layout_marginStart="28dp"
+                android:layout_marginTop="24dp"
+                android:background="@drawable/bg_cooking_step_badge"
+                android:gravity="center"
+                android:textColor="@color/primary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/cookingRecipeTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="34dp"
+            android:gravity="center"
+            android:textColor="@color/on_surface"
+            android:textSize="34sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/cookingCurrentStep"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:lineSpacingExtra="5dp"
+            android:textColor="@color/on_surface_variant"
+            android:textSize="22sp" />
+
+        <FrameLayout
+            android:layout_width="192dp"
+            android:layout_height="192dp"
+            android:layout_marginTop="58dp">
+
+            <com.sotaynauan.ai.ui.cooking.CookingTimerRingView
+                android:id="@+id/cookingTimerRing"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <LinearLayout
+                android:layout_width="156dp"
+                android:layout_height="156dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_cooking_timer_inner"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/cookingTimerText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/primary"
+                    android:textSize="42sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/cookingTimerLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Phút"
+                    android:textColor="@color/on_surface_variant"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/cookingPlayPauseButton"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_gravity="bottom|end"
+                android:background="@drawable/bg_cooking_mic_button"
+                android:gravity="center"
+                android:text="▶"
+                android:textColor="@color/on_primary"
+                android:textSize="34sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <Button
+            android:id="@+id/cookingCompleteStepButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="52dp"
+            android:background="@drawable/bg_primary_button"
+            android:text="Hoàn thành bước  →"
+            android:textAllCaps="false"
+            android:textColor="@color/on_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/cookingReplayButton"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_marginEnd="10dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_cooking_secondary_button"
+                android:text="↶  Đọc lại"
+                android:textAllCaps="false"
+                android:textColor="@color/primary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/cookingAskAiButton"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_cooking_ai_button"
+                android:text="▣  Hỏi AI"
+                android:textAllCaps="false"
+                android:textColor="@color/on_primary_container"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/cookingStepsContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:gravity="center"
+            android:orientation="horizontal" />
+
+        <TextView
+            android:id="@+id/cookingStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:gravity="center"
+            android:textColor="@color/on_surface_variant"
+            android:textSize="14sp" />
+    </LinearLayout>
+</ScrollView>

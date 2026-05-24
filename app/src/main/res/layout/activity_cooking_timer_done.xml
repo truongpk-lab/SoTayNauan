@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#BA1A1A">
+
+    <View
+        android:id="@+id/timerDoneWaveLarge"
+        android:layout_width="280dp"
+        android:layout_height="280dp"
+        android:layout_gravity="center"
+        android:alpha="0.34"
+        android:background="@drawable/bg_timer_done_wave" />
+
+    <View
+        android:id="@+id/timerDoneWaveSmall"
+        android:layout_width="176dp"
+        android:layout_height="176dp"
+        android:layout_gravity="center"
+        android:alpha="0.36"
+        android:background="@drawable/bg_timer_done_wave" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="44dp">
+
+        <Space
+            android:layout_width="1dp"
+            android:layout_height="0dp"
+            android:layout_weight="1.4" />
+
+        <TextView
+            android:id="@+id/timerDoneSpeaker"
+            android:layout_width="152dp"
+            android:layout_height="152dp"
+            android:background="@drawable/bg_timer_done_icon"
+            android:gravity="center"
+            android:text=")))"
+            android:textColor="#FFFFFF"
+            android:textSize="48sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/timerDoneTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="34dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="Đã hết giờ!"
+            android:textColor="#FFFFFF"
+            android:textSize="42sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/timerDoneMessage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="center"
+            android:lineSpacingExtra="5dp"
+            android:text="Kiểm tra món ăn ngay. Chuyển sang bước tiếp theo?"
+            android:textColor="#FDEDEA"
+            android:textSize="24sp" />
+
+        <Space
+            android:layout_width="1dp"
+            android:layout_height="0dp"
+            android:layout_weight="1.1" />
+
+        <Button
+            android:id="@+id/timerDoneCompleteButton"
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:background="@drawable/bg_timer_done_stop"
+            android:text="Hoàn thành bước"
+            android:textAllCaps="false"
+            android:textColor="#BA1A1A"
+            android:textSize="21sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/timerDoneStopAlarmButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_timer_done_quick_add"
+            android:text="Tắt chuông và rung"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/timerDoneQuickAddContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:orientation="horizontal" />
+    </LinearLayout>
+</FrameLayout>

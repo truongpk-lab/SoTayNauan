@@ -1,0 +1,20 @@
+# Loại các tài liệu markdown khỏi commit
+*.md
+*.MD
+
+# Giữ README.md
+!README.md
+
+# Không push các tài liệu frontend phụ trợ
+READ_frontend/
+
+# Build artifacts và cache cục bộ
+.gradle/
+build/
+app/build/
+backend/node_modules/
+backend/.env
+local.properties
+
+# File hệ thống/không cần thiết
+nul
