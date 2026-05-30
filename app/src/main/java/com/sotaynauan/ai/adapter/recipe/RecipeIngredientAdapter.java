@@ -88,26 +88,16 @@ public class RecipeIngredientAdapter {
     }
 
     private String displayName(String ingredient) {
-        String lower = ingredient.toLowerCase();
-        if (lower.contains("thịt bò")) {
-            return "Thịt bò thăn";
-        }
-        if (lower.contains("tỏi")) {
-            return "Hành tím, tỏi";
-        }
-        return ingredient;
+        int separatorIndex = ingredient.indexOf(':');
+        String name = separatorIndex >= 0 ? ingredient.substring(0, separatorIndex) : ingredient;
+        return name.replace("Gia vị - ", "").trim();
     }
 
     private String displayAmount(String ingredient) {
-        String lower = ingredient.toLowerCase();
-        if (lower.contains("thịt bò")) return "300g";
-        if (lower.contains("cà chua")) return "3 quả";
-        if (lower.contains("trứng")) return "2 quả";
-        if (lower.contains("tỏi") || lower.contains("hành tím")) return "1 củ";
-        if (lower.contains("hành lá")) return "Vừa đủ";
-        if (lower.contains("cơm")) return "2 chén";
-        if (lower.contains("gà")) return "400g";
-        if (lower.contains("nước mắm") || lower.contains("tiêu")) return "Vừa đủ";
+        int separatorIndex = ingredient.indexOf(':');
+        if (separatorIndex >= 0 && separatorIndex < ingredient.length() - 1) {
+            return ingredient.substring(separatorIndex + 1).trim();
+        }
         return "Vừa đủ";
     }
 

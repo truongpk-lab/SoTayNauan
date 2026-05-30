@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.sotaynauan.ai.R;
@@ -13,6 +14,7 @@ import com.sotaynauan.ai.data.mapper.RecipeMapper;
 import com.sotaynauan.ai.data.model.Recipe;
 import com.sotaynauan.ai.data.repository.RecipeRepository;
 import com.sotaynauan.ai.data.seed.SeedDataProvider;
+import com.sotaynauan.ai.util.RecipeImageResolver;
 
 import java.util.List;
 import java.util.Locale;
@@ -50,7 +52,10 @@ public class RecipePreviewActivity extends Activity {
     private void bindRecipe(Recipe recipe) {
         TextView hero = findViewById(R.id.recipeHero);
         hero.setText(recipe.getCategory());
-        hero.setBackground(createHeroBackground(recipe.getColorArgb()));
+        findViewById(R.id.recipeHeroContainer).setBackground(createHeroBackground(recipe.getColorArgb()));
+        ImageView heroImage = findViewById(R.id.recipeHeroImage);
+        heroImage.setImageResource(RecipeImageResolver.resolve(this, recipe));
+        heroImage.setContentDescription(recipe.getName());
 
         TextView recipeName = findViewById(R.id.recipeName);
         TextView recipeMeta = findViewById(R.id.recipeMeta);
@@ -65,6 +70,7 @@ public class RecipePreviewActivity extends Activity {
         recipeIngredients.setText(numbered(recipe.getIngredients(), false));
         recipeSteps.setText(numbered(recipe.getSteps(), true));
     }
+
 
     private String numbered(List<String> values, boolean useNumbers) {
         StringBuilder builder = new StringBuilder();

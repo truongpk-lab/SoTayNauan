@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -28,6 +29,7 @@ import com.sotaynauan.ai.data.repository.ShoppingRepository;
 import com.sotaynauan.ai.data.seed.SeedDataProvider;
 import com.sotaynauan.ai.ui.cooking.CookingModeActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingPlanActivity;
+import com.sotaynauan.ai.util.RecipeImageResolver;
 
 import java.util.Locale;
 
@@ -42,11 +44,13 @@ public class RecipeDetailActivity extends Activity {
 
     private TextView heroTitle;
     private TextView heroCategory;
+    private ImageView heroImage;
     private TextView favoriteButton;
     private TextView ratingChip;
     private TextView timeChip;
     private TextView servingChip;
     private TextView difficultyChip;
+    private TextView descriptionText;
     private TextView aiTipText;
     private TextView ingredientTitle;
     private TextView statusText;
@@ -93,11 +97,13 @@ public class RecipeDetailActivity extends Activity {
     private void bindViews() {
         heroTitle = findViewById(R.id.recipeDetailHeroTitle);
         heroCategory = findViewById(R.id.recipeDetailHeroCategory);
+        heroImage = findViewById(R.id.recipeDetailHeroImage);
         favoriteButton = findViewById(R.id.recipeDetailFavoriteButton);
         ratingChip = findViewById(R.id.recipeDetailRatingChip);
         timeChip = findViewById(R.id.recipeDetailTimeChip);
         servingChip = findViewById(R.id.recipeDetailServingChip);
         difficultyChip = findViewById(R.id.recipeDetailDifficultyChip);
+        descriptionText = findViewById(R.id.recipeDetailDescription);
         aiTipText = findViewById(R.id.recipeDetailAiTip);
         ingredientTitle = findViewById(R.id.recipeDetailIngredientTitle);
         statusText = findViewById(R.id.recipeDetailStatus);
@@ -142,11 +148,17 @@ public class RecipeDetailActivity extends Activity {
         heroTitle.setText(recipe.getName());
         heroCategory.setText(recipe.getCategory());
         findViewById(R.id.recipeDetailHero).setBackground(createHeroBackground(recipe.getColorArgb()));
+        heroImage.setImageResource(RecipeImageResolver.resolve(this, recipe));
+        heroImage.setContentDescription(recipe.getName());
         favoriteButton.setText(state.isFavorite() ? "♥" : "♡");
-        ratingChip.setText(String.format(Locale.US, "%.1f", recipe.getPopularityScore() / 20f));
+        ratingChip.setText(recipe.getCalories().isEmpty()
+                ? String.format(Locale.US, "%.1f", recipe.getPopularityScore() / 20f)
+                : recipe.getCalories().replace("/phần", ""));
         timeChip.setText(recipe.getTotalMinutes() + "m");
-        servingChip.setText(suggestServing(recipe));
+        servingChip.setText(recipe.getServing().isEmpty() ? suggestServing(recipe) : recipe.getServing());
         difficultyChip.setText(recipe.getDifficulty());
+        descriptionText.setText(recipe.getDescription()
+                + (recipe.getCost().isEmpty() ? "" : "\nChi phí dự kiến: " + recipe.getCost()));
         aiTipText.setText(createAiTip(recipe));
         ingredientTitle.setText("Danh sách (" + recipe.getIngredients().size() + ")");
         ingredientAdapter.bind(ingredientContainer, recipe.getIngredients(), state.getCheckedIngredients());
@@ -176,6 +188,7 @@ public class RecipeDetailActivity extends Activity {
         }
         return "Chuẩn bị đủ nguyên liệu trước khi bật bếp để các bước nấu liền mạch và món giữ được vị ngon.";
     }
+
 
     private GradientDrawable createHeroBackground(int baseColor) {
         int light = Color.rgb(

@@ -8,6 +8,7 @@ import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -21,6 +22,7 @@ import com.sotaynauan.ai.data.local.datasource.RecipeLocalDataSource;
 import com.sotaynauan.ai.data.local.datasource.ShoppingLocalDataSource;
 import com.sotaynauan.ai.data.local.datasource.VoiceLocalDataSource;
 import com.sotaynauan.ai.data.mapper.RecipeMapper;
+import com.sotaynauan.ai.data.model.Recipe;
 import com.sotaynauan.ai.data.model.VoiceAssistantState;
 import com.sotaynauan.ai.data.remote.AiBackendRemoteDataSource;
 import com.sotaynauan.ai.data.repository.CookingRepository;
@@ -30,6 +32,7 @@ import com.sotaynauan.ai.data.repository.VoiceAssistantRepository;
 import com.sotaynauan.ai.data.seed.SeedDataProvider;
 import com.sotaynauan.ai.service.voice.VoiceSpeaker;
 import com.sotaynauan.ai.ui.cooking.CookingModeActivity;
+import com.sotaynauan.ai.util.RecipeImageResolver;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -49,8 +52,10 @@ public class VoiceAssistantActivity extends Activity {
     private VoiceAssistantViewModel viewModel;
     private VoiceCommandAdapter commandAdapter;
     private VoiceSpeaker voiceSpeaker;
+    private RecipeRepository recipeRepository;
     private MediaRecorder mediaRecorder;
     private File recordingFile;
+    private ImageView kitchenBackground;
     private TextView statusTitle;
     private TextView statusSubtitle;
     private TextView transcriptText;
@@ -133,6 +138,7 @@ public class VoiceAssistantActivity extends Activity {
         voiceSpeaker = new VoiceSpeaker(this);
 
         bindViews();
+        bindRecipeBackground();
         bindActions();
         bindState(viewModel.loadState(activeRecipeId), false);
     }
@@ -149,7 +155,7 @@ public class VoiceAssistantActivity extends Activity {
     }
 
     private VoiceAssistantRepository createVoiceRepository() {
-        RecipeRepository recipeRepository = new RecipeRepository(
+        recipeRepository = new RecipeRepository(
                 new RecipeLocalDataSource(
                         AppDatabase.getInstance(this).recipeDao(),
                         new SeedDataProvider()),
@@ -165,6 +171,7 @@ public class VoiceAssistantActivity extends Activity {
     }
 
     private void bindViews() {
+        kitchenBackground = findViewById(R.id.voiceKitchenBackground);
         statusTitle = findViewById(R.id.voiceStatusTitle);
         statusSubtitle = findViewById(R.id.voiceStatusSubtitle);
         transcriptText = findViewById(R.id.voiceTranscriptText);
@@ -178,6 +185,21 @@ public class VoiceAssistantActivity extends Activity {
         waveThree = findViewById(R.id.voiceWaveThree);
         waveFour = findViewById(R.id.voiceWaveFour);
         waveFive = findViewById(R.id.voiceWaveFive);
+    }
+
+
+    private void bindRecipeBackground() {
+        if (activeRecipeId <= 0L || recipeRepository == null) {
+            kitchenBackground.setImageResource(R.drawable.cooking_step_preview);
+            return;
+        }
+        Recipe recipe = recipeRepository.findRecipe(activeRecipeId);
+        if (recipe == null) {
+            kitchenBackground.setImageResource(R.drawable.cooking_step_preview);
+            return;
+        }
+        kitchenBackground.setImageResource(RecipeImageResolver.resolve(this, recipe));
+        kitchenBackground.setContentDescription(recipe.getName());
     }
 
     private void bindActions() {

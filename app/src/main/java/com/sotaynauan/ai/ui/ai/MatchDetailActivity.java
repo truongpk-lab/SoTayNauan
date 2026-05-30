@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -24,6 +25,7 @@ import com.sotaynauan.ai.data.repository.ShoppingRepository;
 import com.sotaynauan.ai.data.seed.SeedDataProvider;
 import com.sotaynauan.ai.ui.recipe.RecipeDetailActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingPlanActivity;
+import com.sotaynauan.ai.util.RecipeImageResolver;
 
 import java.util.Locale;
 
@@ -36,6 +38,7 @@ public class MatchDetailActivity extends Activity {
     private MatchDetailState currentState;
 
     private TextView heroCategory;
+    private ImageView heroImage;
     private TextView recipeName;
     private TextView scoreBadge;
     private TextView aiExplanation;
@@ -66,6 +69,7 @@ public class MatchDetailActivity extends Activity {
 
     private void bindViews() {
         heroCategory = findViewById(R.id.matchHeroCategory);
+        heroImage = findViewById(R.id.matchHeroImage);
         recipeName = findViewById(R.id.matchRecipeName);
         scoreBadge = findViewById(R.id.matchScoreBadge);
         aiExplanation = findViewById(R.id.matchAiExplanation);
@@ -125,6 +129,8 @@ public class MatchDetailActivity extends Activity {
         if (match == null) {
             recipeName.setText("Chưa có món phù hợp");
             heroCategory.setText("AI Chef");
+            heroImage.setImageResource(com.sotaynauan.ai.R.drawable.cooking_step_preview);
+            findViewById(R.id.matchHeroContainer).setBackground(createHeroBackground(Color.parseColor("#C56A2C")));
             scoreBadge.setText("0%");
             aiExplanation.setText(state.getAiExplanation());
             availableCount.setText("0/0 nguyên liệu");
@@ -138,7 +144,9 @@ public class MatchDetailActivity extends Activity {
 
         recipeId = match.getRecipe().getId();
         heroCategory.setText(match.getRecipe().getCategory());
-        heroCategory.setBackground(createHeroBackground(match.getRecipe().getColorArgb()));
+        heroImage.setImageResource(RecipeImageResolver.resolve(this, match.getRecipe()));
+        heroImage.setContentDescription(match.getRecipe().getName());
+        findViewById(R.id.matchHeroContainer).setBackground(createHeroBackground(match.getRecipe().getColorArgb()));
         recipeName.setText(match.getRecipe().getName());
         scoreBadge.setText(String.format(Locale.US, "Độ khớp: %d%%", match.getScorePercent()));
         aiExplanation.setText(state.getAiExplanation());

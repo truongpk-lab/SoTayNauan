@@ -21,6 +21,13 @@
                 android:layout_height="350dp"
                 android:background="@drawable/bg_recipe_hero">
 
+                <ImageView
+                    android:id="@+id/recipeDetailHeroImage"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@string/ingredients_title"
+                    android:scaleType="centerCrop" />
+
                 <TextView
                     android:id="@+id/recipeDetailBackButton"
                     android:layout_width="48dp"
@@ -113,6 +120,15 @@
                         style="@style/RecipeDetailChip"
                         android:text="Dễ" />
                 </LinearLayout>
+
+                <TextView
+                    android:id="@+id/recipeDetailDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:textColor="@color/on_surface_variant"
+                    android:textSize="16sp"
+                    android:lineSpacingExtra="3dp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"

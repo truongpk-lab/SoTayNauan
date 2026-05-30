@@ -15,12 +15,17 @@ import java.util.Locale;
 import java.util.UUID;
 
 public class AuthRepository {
+    private static final String DEMO_EMAIL = "demo@local.test";
+    private static final String DEMO_PASSWORD = "123456";
+    private static final String DEMO_DISPLAY_NAME = "Demo Chef";
+
     private final AuthLocalDataSource authLocalDataSource;
     private final SessionRepository sessionRepository;
 
     public AuthRepository(AuthLocalDataSource authLocalDataSource, SessionRepository sessionRepository) {
         this.authLocalDataSource = authLocalDataSource;
         this.sessionRepository = sessionRepository;
+        ensureDemoAccount();
     }
 
     public AuthResult login(AuthCredentials credentials) {
@@ -75,6 +80,22 @@ public class AuthRepository {
             return AuthResult.error("Chưa tìm thấy tài khoản local với email này.");
         }
         return AuthResult.success("Tài khoản có trên thiết bị. Vì dữ liệu local đã mã hóa mật khẩu, hãy tạo tài khoản mới nếu bạn quên mật khẩu.", user);
+    }
+
+    private void ensureDemoAccount() {
+        String email = normalizeEmail(DEMO_EMAIL);
+        if (authLocalDataSource.findUserByEmail(email) != null) {
+            return;
+        }
+
+        AuthUser demoUser = new AuthUser(
+                UUID.randomUUID().toString(),
+                email,
+                DEMO_DISPLAY_NAME,
+                hashPassword(DEMO_PASSWORD, email),
+                System.currentTimeMillis()
+        );
+        authLocalDataSource.saveUser(demoUser);
     }
 
     private AuthResult validateCredentials(AuthCredentials credentials) {

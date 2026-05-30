@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -29,6 +30,7 @@ import com.sotaynauan.ai.ui.home.HomeActivity;
 import com.sotaynauan.ai.ui.profile.ProfileActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingListActivity;
 import com.sotaynauan.ai.ui.recipe.RecipeDetailActivity;
+import com.sotaynauan.ai.util.RecipeImageResolver;
 
 import java.util.List;
 import java.util.Locale;
@@ -41,6 +43,7 @@ public class AiRecipeSuggestionActivity extends Activity {
     private AiRecipeSuggestionState currentState;
     private TextView resultsSubtitle;
     private TextView bestHero;
+    private ImageView bestHeroImage;
     private TextView bestRecipeName;
     private TextView bestScore;
     private TextView bestReadyLabel;
@@ -63,6 +66,7 @@ public class AiRecipeSuggestionActivity extends Activity {
 
         resultsSubtitle = findViewById(R.id.resultsSubtitle);
         bestHero = findViewById(R.id.bestHero);
+        bestHeroImage = findViewById(R.id.bestHeroImage);
         bestRecipeName = findViewById(R.id.bestRecipeName);
         bestScore = findViewById(R.id.bestScore);
         bestReadyLabel = findViewById(R.id.bestReadyLabel);
@@ -122,6 +126,9 @@ public class AiRecipeSuggestionActivity extends Activity {
         resultsStatus.setText(state.getStatusMessage());
         if (bestMatch == null) {
             bestMatchCard.setAlpha(0.55f);
+            bestHero.setText("AI Chef");
+            bestHeroImage.setImageResource(R.drawable.cooking_step_preview);
+            findViewById(R.id.bestHeroContainer).setBackground(createGradient(Color.parseColor("#C56A2C"), dp(26)));
             bestRecipeName.setText("Chưa có kết quả phù hợp");
             bestScore.setText("0%");
             bestReadyLabel.setText("Cần thêm nguyên liệu");
@@ -135,7 +142,9 @@ public class AiRecipeSuggestionActivity extends Activity {
         }
         bestMatchCard.setAlpha(1f);
         bestHero.setText(bestMatch.getRecipe().getCategory());
-        bestHero.setBackground(createGradient(bestMatch.getRecipe().getColorArgb(), dp(26)));
+        bestHeroImage.setImageResource(RecipeImageResolver.resolve(this, bestMatch.getRecipe()));
+        bestHeroImage.setContentDescription(bestMatch.getRecipe().getName());
+        findViewById(R.id.bestHeroContainer).setBackground(createGradient(bestMatch.getRecipe().getColorArgb(), dp(26)));
         bestRecipeName.setText(bestMatch.getRecipe().getName());
         bestScore.setText(bestMatch.getScorePercent() + "%");
         bestReadyLabel.setText(bestMatch.getReadinessLabel());

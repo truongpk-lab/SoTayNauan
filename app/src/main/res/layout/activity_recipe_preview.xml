@@ -22,17 +22,33 @@
             android:textSize="15sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/recipeHero"
+        <FrameLayout
+            android:id="@+id/recipeHeroContainer"
             android:layout_width="match_parent"
             android:layout_height="168dp"
             android:layout_marginTop="10dp"
-            android:background="@drawable/bg_recipe_hero"
-            android:gravity="bottom|start"
-            android:padding="20dp"
-            android:textColor="@color/on_primary"
-            android:textSize="21sp"
-            android:textStyle="bold" />
+            android:background="@drawable/bg_recipe_hero">
+
+            <ImageView
+                android:id="@+id/recipeHeroImage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/ingredients_title"
+                android:scaleType="centerCrop"
+                android:src="@drawable/cooking_step_preview" />
+
+            <TextView
+                android:id="@+id/recipeHero"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:background="#66000000"
+                android:gravity="bottom|start"
+                android:padding="20dp"
+                android:textColor="@color/on_primary"
+                android:textSize="21sp"
+                android:textStyle="bold" />
+        </FrameLayout>
 
         <TextView
             android:id="@+id/recipeName"

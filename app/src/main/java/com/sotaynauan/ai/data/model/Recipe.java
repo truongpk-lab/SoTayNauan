@@ -11,6 +11,10 @@ public class Recipe {
     private final int totalMinutes;
     private final String difficulty;
     private final String category;
+    private final String imageName;
+    private final String serving;
+    private final String calories;
+    private final String cost;
     private final int colorArgb;
     private final int popularityScore;
     private final boolean todaySuggestion;
@@ -20,7 +24,8 @@ public class Recipe {
     private final List<String> steps;
 
     public Recipe(long id, String name, String description, int totalMinutes, String difficulty,
-                  String category, int colorArgb, int popularityScore, boolean todaySuggestion,
+                  String category, String imageName, String serving, String calories, String cost,
+                  int colorArgb, int popularityScore, boolean todaySuggestion,
                   String friendName, String friendNote, List<String> ingredients, List<String> steps) {
         this.id = id;
         this.name = name;
@@ -28,6 +33,10 @@ public class Recipe {
         this.totalMinutes = totalMinutes;
         this.difficulty = difficulty;
         this.category = category;
+        this.imageName = imageName;
+        this.serving = serving;
+        this.calories = calories;
+        this.cost = cost;
         this.colorArgb = colorArgb;
         this.popularityScore = popularityScore;
         this.todaySuggestion = todaySuggestion;
@@ -43,6 +52,10 @@ public class Recipe {
     public int getTotalMinutes() { return totalMinutes; }
     public String getDifficulty() { return difficulty; }
     public String getCategory() { return category; }
+    public String getImageName() { return imageName; }
+    public String getServing() { return serving; }
+    public String getCalories() { return calories; }
+    public String getCost() { return cost; }
     public int getColorArgb() { return colorArgb; }
     public int getPopularityScore() { return popularityScore; }
     public boolean isTodaySuggestion() { return todaySuggestion; }

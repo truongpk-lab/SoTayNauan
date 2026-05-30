@@ -4,12 +4,16 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.sotaynauan.ai.data.model.Recipe;
+import com.sotaynauan.ai.util.RecipeImageResolver;
 
 import java.util.List;
 import java.util.Locale;
@@ -47,15 +51,7 @@ public class ProfileSavedRecipeAdapter {
         params.setMargins(0, 0, dp(12), dp(8));
         card.setLayoutParams(params);
 
-        TextView colorBlock = new TextView(context);
-        colorBlock.setText(recipe.getCategory());
-        colorBlock.setTextColor(Color.WHITE);
-        colorBlock.setTextSize(11);
-        colorBlock.setTypeface(Typeface.DEFAULT_BOLD);
-        colorBlock.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        colorBlock.setPadding(dp(6), dp(6), dp(6), dp(8));
-        colorBlock.setBackground(round(recipe.getColorArgb(), dp(18), 0));
-        card.addView(colorBlock, new LinearLayout.LayoutParams(dp(74), dp(82)));
+        card.addView(createFoodThumbnail(recipe), new LinearLayout.LayoutParams(dp(74), dp(82)));
 
         LinearLayout textGroup = new LinearLayout(context);
         textGroup.setOrientation(LinearLayout.VERTICAL);
@@ -70,6 +66,35 @@ public class ProfileSavedRecipeAdapter {
         textGroup.addView(text(String.format(Locale.US, "%d phút", recipe.getTotalMinutes()),
                 13, Color.parseColor("#944A00"), false));
         return card;
+    }
+
+    private View createFoodThumbnail(Recipe recipe) {
+        FrameLayout panel = new FrameLayout(context);
+        panel.setBackground(round(recipe.getColorArgb(), dp(18), 0));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            panel.setClipToOutline(true);
+        }
+
+        ImageView image = new ImageView(context);
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        image.setImageResource(RecipeImageResolver.resolve(context, recipe));
+        image.setContentDescription(recipe.getName());
+        panel.addView(image, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+
+        TextView label = new TextView(context);
+        label.setText(recipe.getCategory());
+        label.setTextColor(Color.WHITE);
+        label.setTextSize(10);
+        label.setTypeface(Typeface.DEFAULT_BOLD);
+        label.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        label.setPadding(dp(5), dp(5), dp(5), dp(7));
+        label.setBackgroundColor(Color.parseColor("#66000000"));
+        panel.addView(label, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        return panel;
     }
 
     private TextView text(String value, int sizeSp, int color, boolean bold) {
@@ -98,4 +123,3 @@ public class ProfileSavedRecipeAdapter {
         return Math.round(value * context.getResources().getDisplayMetrics().density);
     }
 }
-

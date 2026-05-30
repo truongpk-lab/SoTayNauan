@@ -4,12 +4,16 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.sotaynauan.ai.data.model.Recipe;
+import com.sotaynauan.ai.util.RecipeImageResolver;
 
 import java.util.List;
 import java.util.Locale;
@@ -52,10 +56,10 @@ public class HomeRecipeAdapter {
     }
 
     private View createSuggestionCard(Recipe recipe) {
-        LinearLayout card = createCard(recipe, dp(224), dp(220), dp(16));
+        LinearLayout card = createCard(recipe, dp(224), dp(250), dp(14));
         card.setOrientation(LinearLayout.VERTICAL);
 
-        TextView image = createFoodPanel(recipe, dp(188), recipe.getCategory());
+        View image = createFoodPanel(recipe, dp(150), recipe.getCategory());
         card.addView(image);
         card.addView(createTitle(recipe.getName(), 18, Color.parseColor("#2E150B")));
         card.addView(createMeta(recipe));
@@ -67,7 +71,7 @@ public class HomeRecipeAdapter {
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView image = createFoodPanel(recipe, dp(76), recipe.getCategory());
+        View image = createFoodPanel(recipe, dp(76), recipe.getCategory());
         LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(dp(94), dp(76));
         card.addView(image, imageParams);
 
@@ -105,18 +109,37 @@ public class HomeRecipeAdapter {
         return card;
     }
 
-    private TextView createFoodPanel(Recipe recipe, int height, String label) {
-        TextView panel = new TextView(context);
-        panel.setText(label);
-        panel.setTextColor(Color.WHITE);
-        panel.setTextSize(15);
-        panel.setTypeface(Typeface.DEFAULT_BOLD);
-        panel.setGravity(Gravity.BOTTOM | Gravity.START);
-        panel.setPadding(dp(14), dp(14), dp(14), dp(14));
+    private View createFoodPanel(Recipe recipe, int height, String label) {
+        FrameLayout panel = new FrameLayout(context);
         panel.setBackground(createGradient(recipe.getColorArgb()));
-        panel.setMinHeight(height);
+        panel.setMinimumHeight(height);
+        panel.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, height));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            panel.setClipToOutline(true);
+        }
+
+        ImageView image = new ImageView(context);
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        image.setImageResource(RecipeImageResolver.resolve(context, recipe));
+        panel.addView(image, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
+        TextView overlay = new TextView(context);
+        overlay.setText(label);
+        overlay.setTextColor(Color.WHITE);
+        overlay.setTextSize(15);
+        overlay.setTypeface(Typeface.DEFAULT_BOLD);
+        overlay.setGravity(Gravity.BOTTOM | Gravity.START);
+        overlay.setPadding(dp(12), dp(18), dp(12), dp(12));
+        overlay.setBackgroundColor(Color.parseColor("#66000000"));
+        FrameLayout.LayoutParams overlayParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM);
+        panel.addView(overlay, overlayParams);
         return panel;
     }
+
 
     private TextView createTitle(String value, int sizeSp, int color) {
         TextView textView = new TextView(context);

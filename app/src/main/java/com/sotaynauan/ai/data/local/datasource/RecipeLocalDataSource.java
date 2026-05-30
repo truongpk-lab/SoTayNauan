@@ -16,13 +16,18 @@ public class RecipeLocalDataSource {
     }
 
     public void seedIfNeeded() {
+        List<RecipeEntity> seedRecipes = seedDataProvider.createRecipes();
         if (recipeDao.countRecipes() == 0) {
-            recipeDao.insertAll(seedDataProvider.createRecipes());
+            recipeDao.insertAll(seedRecipes);
             return;
         }
-        for (RecipeEntity recipe : seedDataProvider.createRecipes()) {
-            if (recipeDao.findByName(recipe.name) == null) {
-                recipeDao.insert(recipe);
+        for (RecipeEntity seedRecipe : seedRecipes) {
+            RecipeEntity existingRecipe = recipeDao.findByName(seedRecipe.name);
+            if (existingRecipe == null) {
+                recipeDao.insert(seedRecipe);
+            } else {
+                seedRecipe.id = existingRecipe.id;
+                recipeDao.update(seedRecipe);
             }
         }
     }

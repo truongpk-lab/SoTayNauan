@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -26,6 +27,7 @@ import com.sotaynauan.ai.data.repository.ShoppingRepository;
 import com.sotaynauan.ai.data.seed.SeedDataProvider;
 import com.sotaynauan.ai.service.voice.VoiceSpeaker;
 import com.sotaynauan.ai.ui.voice.VoiceAssistantActivity;
+import com.sotaynauan.ai.util.RecipeImageResolver;
 
 import java.util.Locale;
 
@@ -44,6 +46,7 @@ public class CookingModeActivity extends Activity {
     private Button completeStepButton;
     private LinearLayout stepsContainer;
     private FrameLayout photoFrame;
+    private ImageView stepPhoto;
     private int stepTotalSeconds;
     private int remainingSeconds;
     private boolean timerRunning;
@@ -105,6 +108,7 @@ public class CookingModeActivity extends Activity {
         completeStepButton = findViewById(R.id.cookingCompleteStepButton);
         stepsContainer = findViewById(R.id.cookingStepsContainer);
         photoFrame = findViewById(R.id.cookingPhotoFrame);
+        stepPhoto = findViewById(R.id.cookingStepPhoto);
     }
 
     private void bindActions() {
@@ -141,11 +145,14 @@ public class CookingModeActivity extends Activity {
             stepBadge.setText("Bước 0 / 0");
             completeStepButton.setEnabled(false);
             playPauseButton.setEnabled(false);
+            stepPhoto.setImageResource(R.drawable.cooking_step_preview);
             updateTimerViews();
             return;
         }
 
         Recipe recipe = state.getRecipe();
+        stepPhoto.setImageResource(RecipeImageResolver.resolve(this, recipe));
+        stepPhoto.setContentDescription(recipe.getName());
         titleText.setText(state.isCompleted() ? "Hoàn tất món ăn" : createStepTitle(state.getCurrentStepText()));
         currentStepText.setText(state.isCompleted()
                 ? "Món " + recipe.getName() + " đã sẵn sàng. Bạn có thể quay lại công thức hoặc hỏi AI để biến tấu món tiếp theo."

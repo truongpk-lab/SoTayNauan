@@ -4,6 +4,7 @@ import androidx.room.Dao;
 import androidx.room.Insert;
 import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
+import androidx.room.Update;
 
 import com.sotaynauan.ai.data.local.entity.RecipeEntity;
 
@@ -19,6 +20,9 @@ public interface RecipeDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     void insert(RecipeEntity recipe);
+
+    @Update
+    void update(RecipeEntity recipe);
 
     @Query("SELECT * FROM recipes WHERE name = :name LIMIT 1")
     RecipeEntity findByName(String name);

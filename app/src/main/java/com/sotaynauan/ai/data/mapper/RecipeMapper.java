@@ -18,6 +18,10 @@ public class RecipeMapper {
                 entity.totalMinutes,
                 entity.difficulty,
                 entity.category,
+                nullToEmpty(entity.imageName),
+                nullToEmpty(entity.serving),
+                nullToEmpty(entity.calories),
+                nullToEmpty(entity.cost),
                 entity.colorArgb,
                 entity.popularityScore,
                 entity.todaySuggestion,
@@ -37,7 +41,8 @@ public class RecipeMapper {
     }
 
     public RecipeEntity toEntity(String name, String description, int totalMinutes, String difficulty,
-                                 String category, int colorArgb, int popularityScore,
+                                 String category, String imageName, String serving, String calories,
+                                 String cost, int colorArgb, int popularityScore,
                                  boolean todaySuggestion, String friendName, String friendNote,
                                  List<String> ingredients, List<String> steps) {
         RecipeEntity entity = new RecipeEntity();
@@ -46,6 +51,10 @@ public class RecipeMapper {
         entity.totalMinutes = totalMinutes;
         entity.difficulty = difficulty;
         entity.category = category;
+        entity.imageName = imageName;
+        entity.serving = serving;
+        entity.calories = calories;
+        entity.cost = cost;
         entity.colorArgb = colorArgb;
         entity.popularityScore = popularityScore;
         entity.todaySuggestion = todaySuggestion;
@@ -54,6 +63,10 @@ public class RecipeMapper {
         entity.ingredients = join(ingredients);
         entity.steps = join(steps);
         return entity;
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private List<String> split(String raw) {

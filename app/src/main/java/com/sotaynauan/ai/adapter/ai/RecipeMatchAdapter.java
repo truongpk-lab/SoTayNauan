@@ -4,12 +4,17 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.sotaynauan.ai.data.model.Recipe;
 import com.sotaynauan.ai.data.model.RecipeMatch;
+import com.sotaynauan.ai.util.RecipeImageResolver;
 
 import java.util.List;
 import java.util.Locale;
@@ -39,7 +44,7 @@ public class RecipeMatchAdapter {
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(12), dp(12), dp(12), dp(12));
-        row.setBackground(createRoundDrawable(Color.WHITE, dp(2)));
+        row.setBackground(createRoundDrawable(Color.WHITE, dp(18)));
         row.setClickable(true);
         row.setFocusable(true);
         row.setOnClickListener(view -> listener.onRecipeClick(match));
@@ -50,15 +55,8 @@ public class RecipeMatchAdapter {
         row.setLayoutParams(rowParams);
         row.setElevation(dp(2));
 
-        TextView image = new TextView(context);
-        image.setText(match.getRecipe().getCategory());
-        image.setTextColor(Color.WHITE);
-        image.setTextSize(12);
-        image.setTypeface(Typeface.DEFAULT_BOLD);
-        image.setGravity(Gravity.BOTTOM | Gravity.START);
-        image.setPadding(dp(8), dp(8), dp(8), dp(8));
-        image.setBackground(createGradient(match.getRecipe().getColorArgb(), dp(14)));
-        row.addView(image, new LinearLayout.LayoutParams(dp(84), dp(84)));
+        row.addView(createFoodThumbnail(match.getRecipe()),
+                new LinearLayout.LayoutParams(dp(84), dp(84)));
 
         LinearLayout textGroup = new LinearLayout(context);
         textGroup.setOrientation(LinearLayout.VERTICAL);
@@ -79,6 +77,35 @@ public class RecipeMatchAdapter {
         arrow.setGravity(Gravity.CENTER);
         row.addView(arrow, new LinearLayout.LayoutParams(dp(28), dp(48)));
         return row;
+    }
+
+    private View createFoodThumbnail(Recipe recipe) {
+        FrameLayout panel = new FrameLayout(context);
+        panel.setBackground(createGradient(recipe.getColorArgb(), dp(14)));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            panel.setClipToOutline(true);
+        }
+
+        ImageView image = new ImageView(context);
+        image.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        image.setImageResource(RecipeImageResolver.resolve(context, recipe));
+        image.setContentDescription(recipe.getName());
+        panel.addView(image, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+
+        TextView overlay = new TextView(context);
+        overlay.setText(recipe.getCategory());
+        overlay.setTextColor(Color.WHITE);
+        overlay.setTextSize(11);
+        overlay.setTypeface(Typeface.DEFAULT_BOLD);
+        overlay.setGravity(Gravity.BOTTOM | Gravity.START);
+        overlay.setPadding(dp(8), dp(6), dp(8), dp(8));
+        overlay.setBackgroundColor(Color.parseColor("#66000000"));
+        panel.addView(overlay, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        return panel;
     }
 
     private TextView createText(String value, int sizeSp, int color, boolean bold) {

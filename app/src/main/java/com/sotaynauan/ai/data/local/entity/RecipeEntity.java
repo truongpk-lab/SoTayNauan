@@ -12,6 +12,10 @@ public class RecipeEntity {
     public int totalMinutes;
     public String difficulty;
     public String category;
+    public String imageName;
+    public String serving;
+    public String calories;
+    public String cost;
     public int colorArgb;
     public int popularityScore;
     public boolean todaySuggestion;
