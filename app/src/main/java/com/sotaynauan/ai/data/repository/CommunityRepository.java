@@ -6,6 +6,7 @@ import com.sotaynauan.ai.data.local.entity.CommunityShareEntity;
 import com.sotaynauan.ai.data.mapper.CommunityMapper;
 import com.sotaynauan.ai.data.model.CommunityFriend;
 import com.sotaynauan.ai.data.model.CommunityState;
+import com.sotaynauan.ai.data.model.Recipe;
 
 import java.util.List;
 import java.util.Locale;
@@ -71,14 +72,23 @@ public class CommunityRepository {
         return loadCommunity("", "Không tìm thấy chia sẻ này.");
     }
 
-    public CommunityState addComment(String shareId) {
+    public CommunityState addComment(String shareId, String comment) {
         CommunityShareEntity share = localDataSource.findShare(shareId);
         if (share != null) {
             share.commentCount += 1;
             localDataSource.updateShare(share);
-            return loadCommunity("", "Đã thêm bình luận động viên vào " + share.recipeName + ".");
+            return loadCommunity("", "Đã thêm bình luận vào " + share.recipeName
+                    + ": " + safeCommentPreview(comment));
         }
         return loadCommunity("", "Không tìm thấy chia sẻ này.");
+    }
+
+    private String safeCommentPreview(String comment) {
+        String value = comment == null ? "" : comment.trim().replaceAll("\\s+", " ");
+        if (value.isEmpty()) {
+            return "Bình luận mới";
+        }
+        return value.length() > 42 ? value.substring(0, 42) + "..." : value;
     }
 
     public CommunityState toggleSave(String shareId) {
@@ -94,10 +104,15 @@ public class CommunityRepository {
     }
 
     public CommunityState shareRecipeWithFriend(String friendId) {
+        return shareRecipeWithFriend(friendId, null);
+    }
+
+    public CommunityState shareRecipeWithFriend(String friendId, Recipe recipe) {
         CommunityFriendEntity friend = localDataSource.findFriend(friendId);
         if (friend == null) {
             return loadCommunity("", "Không tìm thấy bạn bè để chia sẻ.");
         }
+        String recipeName = recipe == null ? "Mâm cơm bếp nhà" : recipe.getName();
         friend.sharedRecipeCount += 1;
         localDataSource.updateFriend(friend);
 
@@ -105,10 +120,10 @@ public class CommunityRepository {
         share.id = "my-share-" + friendId + "-" + System.currentTimeMillis();
         share.friendId = friend.id;
         share.friendName = "Bạn → " + friend.name;
-        share.recipeId = 0L;
-        share.recipeName = "Mâm cơm bếp nhà";
+        share.recipeId = recipe == null ? 0L : recipe.getId();
+        share.recipeName = recipeName;
         share.message = String.format(Locale.US,
-                "Bạn vừa chia sẻ một gợi ý bữa cơm ấm áp cho %s.", friend.name);
+                "Bạn vừa chia sẻ công thức %s cho %s.", recipeName, friend.name);
         share.likeCount = 0;
         share.commentCount = 0;
         share.liked = false;
@@ -116,6 +131,6 @@ public class CommunityRepository {
         share.fromMe = true;
         share.createdAtMillis = System.currentTimeMillis();
         localDataSource.insertShare(share);
-        return loadCommunity("", "Đã gửi chia sẻ local cho " + friend.name + ".");
+        return loadCommunity("", "Đã gửi công thức " + recipeName + " cho " + friend.name + ".");
     }
 }

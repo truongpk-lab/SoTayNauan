@@ -17,6 +17,7 @@ public class CookingLocalDataSource {
     private static final String KEY_TIMER_STARTED_AT = "timer_started_at";
     private static final String KEY_TIMER_ALARM_ACKNOWLEDGED = "timer_alarm_acknowledged";
     private static final String KEY_COOKED_COUNT = "cooked_count";
+    private static final String KEY_COOKED_RECIPE_IDS = "cooked_recipe_ids";
     private static final String KEY_FINISHED_PHOTO_PREFIX = "finished_photo_";
     private static final String KEY_FINISHED_NOTE_PREFIX = "finished_note_";
 
@@ -46,7 +47,7 @@ public class CookingLocalDataSource {
     public void updateStep(int stepIndex, boolean completed) {
         boolean shouldIncrementCookedCount = completed && !isCompleted();
         int nextCookedCount = getCookedCount() + (shouldIncrementCookedCount ? 1 : 0);
-        preferences.edit()
+        SharedPreferences.Editor editor = preferences.edit()
                 .putInt(KEY_STEP_INDEX, stepIndex)
                 .putBoolean(KEY_COMPLETED, completed)
                 .putInt(KEY_COOKED_COUNT, nextCookedCount)
@@ -57,8 +58,13 @@ public class CookingLocalDataSource {
                 .remove(KEY_TIMER_REMAINING_SECONDS)
                 .remove(KEY_TIMER_RUNNING)
                 .remove(KEY_TIMER_STARTED_AT)
-                .remove(KEY_TIMER_ALARM_ACKNOWLEDGED)
-                .apply();
+                .remove(KEY_TIMER_ALARM_ACKNOWLEDGED);
+        if (shouldIncrementCookedCount) {
+            editor.putString(KEY_COOKED_RECIPE_IDS, appendRecipeId(
+                    preferences.getString(KEY_COOKED_RECIPE_IDS, ""),
+                    getActiveRecipeId()));
+        }
+        editor.apply();
     }
 
     public void saveTimer(long recipeId, int stepIndex, int totalSeconds, int remainingSeconds,
@@ -147,6 +153,52 @@ public class CookingLocalDataSource {
 
     public int getCookedCount() {
         return preferences.getInt(KEY_COOKED_COUNT, 0);
+    }
+
+    public java.util.List<Long> getCookedRecipeIds() {
+        String raw = preferences.getString(KEY_COOKED_RECIPE_IDS, "");
+        java.util.List<Long> ids = new java.util.ArrayList<>();
+        if (raw == null || raw.trim().isEmpty()) {
+            return ids;
+        }
+        String[] parts = raw.split(",");
+        for (String part : parts) {
+            try {
+                ids.add(Long.parseLong(part.trim()));
+            } catch (NumberFormatException ignored) {
+                // Ignore corrupt ids.
+            }
+        }
+        return ids;
+    }
+
+    private String appendRecipeId(String rawIds, long recipeId) {
+        if (recipeId <= 0L) {
+            return rawIds == null ? "" : rawIds;
+        }
+        java.util.List<Long> ids = new java.util.ArrayList<>();
+        if (rawIds != null && !rawIds.trim().isEmpty()) {
+            String[] parts = rawIds.split(",");
+            for (String part : parts) {
+                try {
+                    long id = Long.parseLong(part.trim());
+                    if (id != recipeId) {
+                        ids.add(id);
+                    }
+                } catch (NumberFormatException ignored) {
+                    // Ignore corrupt ids.
+                }
+            }
+        }
+        ids.add(0, recipeId);
+        StringBuilder builder = new StringBuilder();
+        for (Long id : ids) {
+            if (builder.length() > 0) {
+                builder.append(",");
+            }
+            builder.append(id);
+        }
+        return builder.toString();
     }
 
     public void saveFinishedPhoto(long recipeId, String photoUri) {

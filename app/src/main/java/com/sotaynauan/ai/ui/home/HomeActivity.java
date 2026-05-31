@@ -17,6 +17,7 @@ import com.sotaynauan.ai.data.model.Recipe;
 import com.sotaynauan.ai.data.repository.RecipeRepository;
 import com.sotaynauan.ai.data.seed.SeedDataProvider;
 import com.sotaynauan.ai.ui.ai.AiChefActivity;
+import com.sotaynauan.ai.ui.ai.IngredientInputActivity;
 import com.sotaynauan.ai.ui.community.CommunityActivity;
 import com.sotaynauan.ai.ui.profile.ProfileActivity;
 import com.sotaynauan.ai.ui.recipe.RecipeDetailActivity;
@@ -42,6 +43,9 @@ public class HomeActivity extends Activity {
 
         Button quickRecipeButton = findViewById(R.id.quickRecipeButton);
         quickRecipeButton.setOnClickListener(view -> openQuickSuggestion());
+        Button ingredientSuggestionButton = findViewById(R.id.ingredientSuggestionButton);
+        ingredientSuggestionButton.setOnClickListener(view ->
+                startActivity(new Intent(this, IngredientInputActivity.class)));
 
         bindBottomNavigation();
     }

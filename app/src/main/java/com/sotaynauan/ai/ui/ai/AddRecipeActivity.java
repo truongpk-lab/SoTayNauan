@@ -28,12 +28,14 @@ import com.sotaynauan.ai.ui.recipe.RecipeDetailActivity;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 public class AddRecipeActivity extends Activity {
     private static final int REQUEST_CAPTURE_PHOTO = 41;
+    private static final int REQUEST_PICK_PHOTO = 42;
 
     private RecipeRepository recipeRepository;
     private EditText nameInput;
@@ -59,7 +61,25 @@ public class AddRecipeActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQUEST_CAPTURE_PHOTO || resultCode != RESULT_OK || data == null) {
+        if (resultCode != RESULT_OK || data == null) {
+            return;
+        }
+        if (requestCode == REQUEST_PICK_PHOTO) {
+            Uri selectedImage = data.getData();
+            if (selectedImage == null) {
+                statusText.setText("Không lấy được ảnh đã chọn.");
+                return;
+            }
+            photoUri = saveRecipePhoto(selectedImage);
+            if (photoUri.isEmpty()) {
+                statusText.setText("Không lưu được ảnh món ăn đã chọn.");
+                return;
+            }
+            photoPreview.setImageURI(Uri.parse(photoUri));
+            statusText.setText("Đã chọn ảnh món ăn cho công thức mới.");
+            return;
+        }
+        if (requestCode != REQUEST_CAPTURE_PHOTO) {
             return;
         }
         Object rawBitmap = data.getExtras() == null ? null : data.getExtras().get("data");
@@ -108,6 +128,10 @@ public class AddRecipeActivity extends Activity {
         captureButton.setOnClickListener(view -> capturePhoto());
         root.addView(captureButton);
 
+        Button pickButton = button("Chọn ảnh từ thư viện");
+        pickButton.setOnClickListener(view -> pickPhoto());
+        root.addView(pickButton);
+
         nameInput = input("Tên món", false);
         descriptionInput = input("Mô tả món ăn", true);
         minutesInput = input("Thời gian nấu, ví dụ 30", false);
@@ -140,6 +164,15 @@ public class AddRecipeActivity extends Activity {
             return;
         }
         startActivityForResult(intent, REQUEST_CAPTURE_PHOTO);
+    }
+
+    private void pickPhoto() {
+        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        if (intent.resolveActivity(getPackageManager()) == null) {
+            statusText.setText("Thiết bị chưa có ứng dụng thư viện ảnh.");
+            return;
+        }
+        startActivityForResult(intent, REQUEST_PICK_PHOTO);
     }
 
     private void saveRecipe() {
@@ -186,6 +219,32 @@ public class AddRecipeActivity extends Activity {
                     String.format(Locale.US, "recipe_%d.jpg", System.currentTimeMillis()));
             FileOutputStream outputStream = new FileOutputStream(photoFile);
             bitmap.compress(Bitmap.CompressFormat.JPEG, 92, outputStream);
+            outputStream.close();
+            return Uri.fromFile(photoFile).toString();
+        } catch (Exception exception) {
+            return "";
+        }
+    }
+
+    private String saveRecipePhoto(Uri sourceUri) {
+        try {
+            File directory = new File(getFilesDir(), "recipe_photos");
+            if (!directory.exists() && !directory.mkdirs()) {
+                return "";
+            }
+            File photoFile = new File(directory,
+                    String.format(Locale.US, "recipe_%d.jpg", System.currentTimeMillis()));
+            InputStream inputStream = getContentResolver().openInputStream(sourceUri);
+            if (inputStream == null) {
+                return "";
+            }
+            FileOutputStream outputStream = new FileOutputStream(photoFile);
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, read);
+            }
+            inputStream.close();
             outputStream.close();
             return Uri.fromFile(photoFile).toString();
         } catch (Exception exception) {

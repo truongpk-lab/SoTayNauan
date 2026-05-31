@@ -19,6 +19,12 @@
             android:name=".ui.profile.RecipeListActivity"
             android:exported="false" />
         <activity
+            android:name=".ui.profile.AiTasteProfileActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.profile.AppSettingsActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.community.CommunityActivity"
             android:exported="false" />
         <activity

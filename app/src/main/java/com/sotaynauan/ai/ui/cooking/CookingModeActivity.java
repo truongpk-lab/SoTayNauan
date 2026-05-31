@@ -50,6 +50,7 @@ public class CookingModeActivity extends Activity {
     private TextView timerText;
     private TextView statusText;
     private TextView playPauseButton;
+    private Button previousStepButton;
     private Button completeStepButton;
     private Button captureFinishedPhotoButton;
     private Button saveFinishedNoteButton;
@@ -139,6 +140,7 @@ public class CookingModeActivity extends Activity {
         timerText = findViewById(R.id.cookingTimerText);
         statusText = findViewById(R.id.cookingStatus);
         playPauseButton = findViewById(R.id.cookingPlayPauseButton);
+        previousStepButton = findViewById(R.id.cookingPreviousStepButton);
         completeStepButton = findViewById(R.id.cookingCompleteStepButton);
         captureFinishedPhotoButton = findViewById(R.id.cookingCaptureFinishedPhotoButton);
         saveFinishedNoteButton = findViewById(R.id.cookingSaveFinishedNoteButton);
@@ -163,6 +165,7 @@ public class CookingModeActivity extends Activity {
         findViewById(R.id.cookingAskAiButton).setOnClickListener(view -> openVoiceAssistant());
         findViewById(R.id.cookingAskTopButton).setOnClickListener(view -> openVoiceAssistant());
         playPauseButton.setOnClickListener(view -> openTimer());
+        previousStepButton.setOnClickListener(view -> bindSession(viewModel.goToPreviousStep()));
         completeStepButton.setOnClickListener(view -> bindSession(viewModel.completeCurrentStep()));
         captureFinishedPhotoButton.setOnClickListener(view -> captureFinishedPhoto());
         saveFinishedNoteButton.setOnClickListener(view -> saveFinishedNote());
@@ -184,6 +187,7 @@ public class CookingModeActivity extends Activity {
             titleText.setText("Chế độ nấu");
             currentStepText.setText("Chưa có công thức đang nấu.");
             stepBadge.setText("Bước 0 / 0");
+            previousStepButton.setEnabled(false);
             completeStepButton.setEnabled(false);
             playPauseButton.setEnabled(false);
             stepPhoto.setImageResource(R.drawable.cooking_step_preview);
@@ -201,8 +205,12 @@ public class CookingModeActivity extends Activity {
                 : state.getCurrentStepText());
         stepBadge.setText("•  Bước " + (state.getCurrentStepIndex() + 1) + " / " + Math.max(1, state.getStepCount()));
         stepProgressAdapter.bind(stepsContainer, recipe.getSteps(), state.getCurrentStepIndex(), state.isCompleted());
-        completeStepButton.setText(state.isCompleted() ? "Đã hoàn thành món" : "Hoàn thành bước  →");
+        previousStepButton.setText("←  Quay lại");
+        previousStepButton.setEnabled(!state.isCompleted() && state.getCurrentStepIndex() > 0);
+        previousStepButton.setAlpha(previousStepButton.isEnabled() ? 1f : 0.55f);
+        completeStepButton.setText(state.isCompleted() ? "Đã xong" : "Hoàn thành  →");
         completeStepButton.setEnabled(!state.isCompleted() && !recipe.getSteps().isEmpty());
+        completeStepButton.setAlpha(completeStepButton.isEnabled() ? 1f : 0.55f);
         playPauseButton.setEnabled(!state.isCompleted() && stepTotalSeconds > 0);
         photoFrame.setAlpha(state.isCompleted() ? 0.72f : 1f);
         bindFinishedJournal(state);

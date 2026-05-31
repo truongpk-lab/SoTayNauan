@@ -42,7 +42,6 @@ public class ShoppingListActivity extends Activity {
     private static final String FILTER_NEED = "Cần mua";
     private static final String FILTER_BOUGHT = "Đã mua";
     private static final String FILTER_HOME = "Đã có ở nhà";
-    private static final String FILTER_SKIPPED = "Bỏ qua";
 
     private ShoppingListViewModel viewModel;
     private ShoppingListAdapter adapter;
@@ -163,7 +162,6 @@ public class ShoppingListActivity extends Activity {
         addFilterChip(FILTER_NEED, currentState.getNeedBuyCount());
         addFilterChip(FILTER_BOUGHT, countStatus(currentState, ShoppingItemStatus.BOUGHT));
         addFilterChip(FILTER_HOME, countStatus(currentState, ShoppingItemStatus.AT_HOME));
-        addFilterChip(FILTER_SKIPPED, countStatus(currentState, ShoppingItemStatus.SKIPPED));
     }
 
     private void addFilterChip(String label, int count) {
@@ -194,8 +192,7 @@ public class ShoppingListActivity extends Activity {
             if (FILTER_ALL.equals(activeFilter)
                     || FILTER_NEED.equals(activeFilter) && item.getStatus() == ShoppingItemStatus.NEED_BUY
                     || FILTER_BOUGHT.equals(activeFilter) && item.getStatus() == ShoppingItemStatus.BOUGHT
-                    || FILTER_HOME.equals(activeFilter) && item.getStatus() == ShoppingItemStatus.AT_HOME
-                    || FILTER_SKIPPED.equals(activeFilter) && item.getStatus() == ShoppingItemStatus.SKIPPED) {
+                    || FILTER_HOME.equals(activeFilter) && item.getStatus() == ShoppingItemStatus.AT_HOME) {
                 result.add(item);
             }
         }

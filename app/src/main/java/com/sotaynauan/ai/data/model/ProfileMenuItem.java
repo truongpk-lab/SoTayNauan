@@ -5,7 +5,6 @@ public class ProfileMenuItem {
     public static final String ACTION_FAVORITES = "favorites";
     public static final String ACTION_FRIENDS = "friends";
     public static final String ACTION_AI_TASTE = "ai_taste";
-    public static final String ACTION_VOICE_SETTINGS = "voice_settings";
     public static final String ACTION_APP_SETTINGS = "app_settings";
 
     private final String id;

@@ -79,6 +79,24 @@ public class CookingRepository {
                         : "Đã chuyển sang bước " + (nextIndex + 1) + ".");
     }
 
+    public CookingSessionState goToPreviousStep() {
+        Recipe recipe = recipeRepository.findRecipe(localDataSource.getActiveRecipeId());
+        if (recipe == null) {
+            return createState(null, 0, false, "Không tìm thấy công thức đang nấu.");
+        }
+        if (localDataSource.isCompleted()) {
+            return createState(recipe, safeStepIndex(recipe, localDataSource.getCurrentStepIndex()),
+                    true, "Món đã hoàn thành nên không quay lại bước trước.");
+        }
+        int currentIndex = safeStepIndex(recipe, localDataSource.getCurrentStepIndex());
+        int previousIndex = Math.max(0, currentIndex - 1);
+        localDataSource.updateStep(previousIndex, false);
+        return createState(recipe, previousIndex, false,
+                previousIndex == currentIndex
+                        ? "Bạn đang ở bước đầu tiên."
+                        : "Đã quay lại bước " + (previousIndex + 1) + ".");
+    }
+
     public CookingSessionState replayCurrentInstruction() {
         Recipe recipe = recipeRepository.findRecipe(localDataSource.getActiveRecipeId());
         if (recipe == null) {

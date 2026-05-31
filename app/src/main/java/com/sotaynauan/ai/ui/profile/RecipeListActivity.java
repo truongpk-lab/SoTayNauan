@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -12,12 +13,14 @@ import android.widget.TextView;
 import com.sotaynauan.ai.R;
 import com.sotaynauan.ai.adapter.home.HomeRecipeAdapter;
 import com.sotaynauan.ai.data.local.database.AppDatabase;
+import com.sotaynauan.ai.data.local.datasource.CookingLocalDataSource;
 import com.sotaynauan.ai.data.local.datasource.RecipeDetailLocalDataSource;
 import com.sotaynauan.ai.data.local.datasource.RecipeLocalDataSource;
 import com.sotaynauan.ai.data.mapper.RecipeMapper;
 import com.sotaynauan.ai.data.model.Recipe;
 import com.sotaynauan.ai.data.repository.RecipeRepository;
 import com.sotaynauan.ai.data.seed.SeedDataProvider;
+import com.sotaynauan.ai.ui.ai.AddRecipeActivity;
 import com.sotaynauan.ai.ui.recipe.RecipeDetailActivity;
 
 import java.util.ArrayList;
@@ -27,9 +30,11 @@ public class RecipeListActivity extends Activity {
     public static final String EXTRA_MODE = "extra_mode";
     public static final String MODE_ALL = "all";
     public static final String MODE_FAVORITES = "favorites";
+    public static final String MODE_COOKED = "cooked";
 
     private RecipeRepository recipeRepository;
     private RecipeDetailLocalDataSource recipeDetailLocalDataSource;
+    private CookingLocalDataSource cookingLocalDataSource;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,13 +44,17 @@ public class RecipeListActivity extends Activity {
                         new SeedDataProvider()),
                 new RecipeMapper());
         recipeDetailLocalDataSource = new RecipeDetailLocalDataSource(this);
+        cookingLocalDataSource = new CookingLocalDataSource(this);
         buildLayout();
     }
 
     private void buildLayout() {
         String mode = getIntent().getStringExtra(EXTRA_MODE);
         boolean favoritesMode = MODE_FAVORITES.equals(mode);
-        List<Recipe> recipes = favoritesMode ? loadFavoriteRecipes() : recipeRepository.getAllRecipes();
+        boolean cookedMode = MODE_COOKED.equals(mode);
+        List<Recipe> recipes = favoritesMode
+                ? loadFavoriteRecipes()
+                : cookedMode ? loadCookedRecipes() : recipeRepository.getAllRecipes();
 
         ScrollView scrollView = new ScrollView(this);
         scrollView.setBackgroundColor(getResources().getColor(R.color.background));
@@ -61,10 +70,25 @@ public class RecipeListActivity extends Activity {
         back.setOnClickListener(view -> finish());
         root.addView(back);
 
-        root.addView(text(favoritesMode ? "Món yêu thích" : "Công thức của tôi",
+        root.addView(text(titleForMode(favoritesMode, cookedMode),
                 30, getResources().getColor(R.color.on_surface), true));
-        root.addView(text(createSubtitle(favoritesMode, recipes.size()),
+        root.addView(text(createSubtitle(favoritesMode, cookedMode, recipes.size()),
                 15, getResources().getColor(R.color.on_surface_variant), false));
+
+        if (!favoritesMode && !cookedMode) {
+            Button addRecipeButton = new Button(this);
+            addRecipeButton.setText("Thêm công thức mới");
+            addRecipeButton.setAllCaps(false);
+            addRecipeButton.setTextSize(16);
+            addRecipeButton.setTextColor(getResources().getColor(R.color.on_primary));
+            addRecipeButton.setBackgroundResource(R.drawable.bg_primary_button);
+            LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(56));
+            addParams.setMargins(0, dp(18), 0, 0);
+            root.addView(addRecipeButton, addParams);
+            addRecipeButton.setOnClickListener(view ->
+                    startActivity(new Intent(this, AddRecipeActivity.class)));
+        }
 
         LinearLayout listContainer = new LinearLayout(this);
         listContainer.setOrientation(LinearLayout.VERTICAL);
@@ -75,9 +99,7 @@ public class RecipeListActivity extends Activity {
         root.addView(listContainer, listParams);
 
         if (recipes.isEmpty()) {
-            TextView empty = text(favoritesMode
-                            ? "Chưa có món yêu thích. Hãy mở công thức và bấm tim để lưu vào đây."
-                            : "Chưa có công thức nào trong kho local.",
+            TextView empty = text(emptyText(favoritesMode, cookedMode),
                     16, getResources().getColor(R.color.primary), true);
             empty.setPadding(dp(14), dp(18), dp(14), dp(18));
             listContainer.addView(empty);
@@ -100,11 +122,45 @@ public class RecipeListActivity extends Activity {
         return favorites;
     }
 
-    private String createSubtitle(boolean favoritesMode, int count) {
+    private List<Recipe> loadCookedRecipes() {
+        List<Recipe> cooked = new ArrayList<>();
+        for (Long recipeId : cookingLocalDataSource.getCookedRecipeIds()) {
+            Recipe recipe = recipeRepository.findRecipe(recipeId);
+            if (recipe != null) {
+                cooked.add(recipe);
+            }
+        }
+        return cooked;
+    }
+
+    private String titleForMode(boolean favoritesMode, boolean cookedMode) {
+        if (favoritesMode) {
+            return "Món yêu thích";
+        }
+        if (cookedMode) {
+            return "Món đã nấu";
+        }
+        return "Công thức của tôi";
+    }
+
+    private String createSubtitle(boolean favoritesMode, boolean cookedMode, int count) {
         if (favoritesMode) {
             return "Hiển thị " + count + " món bạn đã bấm tim yêu thích.";
         }
+        if (cookedMode) {
+            return "Hiển thị " + count + " món bạn đã nấu hoàn tất.";
+        }
         return "Hiển thị tất cả " + count + " công thức món ăn hiện có trong app.";
+    }
+
+    private String emptyText(boolean favoritesMode, boolean cookedMode) {
+        if (favoritesMode) {
+            return "Chưa có món yêu thích. Hãy mở công thức và bấm tim để lưu vào đây.";
+        }
+        if (cookedMode) {
+            return "Chưa có món đã nấu. Hãy hoàn thành một công thức để lưu vào đây.";
+        }
+        return "Chưa có công thức nào trong kho local.";
     }
 
     private void openRecipe(Recipe recipe) {

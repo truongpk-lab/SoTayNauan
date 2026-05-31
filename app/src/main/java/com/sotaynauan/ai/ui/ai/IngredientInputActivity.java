@@ -3,6 +3,8 @@ package com.sotaynauan.ai.ui.ai;
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
@@ -46,10 +48,26 @@ public class IngredientInputActivity extends Activity {
         findViewById(R.id.addIngredientButton).setOnClickListener(view -> addTypedIngredient());
         input.setOnEditorActionListener((view, actionId, event) -> {
             if (actionId == EditorInfo.IME_ACTION_DONE) {
-                addTypedIngredient();
+                addTypedIngredients();
                 return true;
             }
             return false;
+        });
+        input.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence value, int start, int count, int after) {
+                // No-op.
+            }
+
+            @Override
+            public void onTextChanged(CharSequence value, int start, int before, int count) {
+                updateCtaState(viewModel.loadState());
+            }
+
+            @Override
+            public void afterTextChanged(Editable value) {
+                // No-op.
+            }
         });
         findViewById(R.id.cameraScanButton).setOnClickListener(view ->
                 bindState(viewModel.scanOfflineSample()));
@@ -61,13 +79,35 @@ public class IngredientInputActivity extends Activity {
     }
 
     private void addTypedIngredient() {
-        IngredientInputState state = viewModel.addIngredient(input.getText().toString());
+        IngredientInputState state = addTypedIngredients();
+        if (state != null) {
+            bindState(state);
+        }
+    }
+
+    private IngredientInputState addTypedIngredients() {
+        String raw = input.getText().toString();
         input.setText("");
+        IngredientInputState state = viewModel.loadState();
+        String[] ingredients = raw.split("[,;\\n]+");
+        for (String ingredient : ingredients) {
+            if (!ingredient.trim().isEmpty()) {
+                state = viewModel.addIngredient(ingredient);
+            }
+        }
         bindState(state);
+        return state;
     }
 
     private void continueToSuggestions() {
-        IngredientInputState state = viewModel.markReadyForSuggestions();
+        IngredientInputState state = input.getText().toString().trim().isEmpty()
+                ? viewModel.loadState()
+                : addTypedIngredients();
+        if (state.getCount() == 0) {
+            bindState(viewModel.addIngredient(""));
+            return;
+        }
+        state = viewModel.markReadyForSuggestions();
         bindState(state);
         startActivity(new Intent(this, IngredientConfirmActivity.class));
     }
@@ -77,8 +117,14 @@ public class IngredientInputActivity extends Activity {
                 ingredient -> bindState(viewModel.removeIngredient(ingredient)));
         countText.setText(state.getCount() + " món");
         emptyText.setVisibility(state.getCount() == 0 ? TextView.VISIBLE : TextView.GONE);
-        ctaButton.setEnabled(state.getCount() > 0);
-        ctaButton.setAlpha(state.getCount() > 0 ? 1f : 0.55f);
+        updateCtaState(state);
         statusText.setText(state.getLastAction());
+    }
+
+    private void updateCtaState(IngredientInputState state) {
+        boolean hasTypedIngredient = !input.getText().toString().trim().isEmpty();
+        boolean canSuggest = state.getCount() > 0 || hasTypedIngredient;
+        ctaButton.setEnabled(canSuggest);
+        ctaButton.setAlpha(canSuggest ? 1f : 0.55f);
     }
 }

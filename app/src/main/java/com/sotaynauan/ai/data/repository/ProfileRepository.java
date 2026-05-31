@@ -124,7 +124,6 @@ public class ProfileRepository {
                 new ProfileMenuItem(ProfileMenuItem.ACTION_FAVORITES, "♡", "Món yêu thích", ""),
                 new ProfileMenuItem(ProfileMenuItem.ACTION_FRIENDS, "Nh", "Bạn bè & Nhóm", ""),
                 new ProfileMenuItem(ProfileMenuItem.ACTION_AI_TASTE, "AI", "Hồ sơ khẩu vị AI", "Mới"),
-                new ProfileMenuItem(ProfileMenuItem.ACTION_VOICE_SETTINGS, "Mic", "Cài đặt giọng nói", ""),
                 new ProfileMenuItem(ProfileMenuItem.ACTION_APP_SETTINGS, "⚙", "Cài đặt app", ""));
     }
 }

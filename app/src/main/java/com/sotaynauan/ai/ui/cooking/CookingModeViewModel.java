@@ -19,6 +19,10 @@ public class CookingModeViewModel {
         return cookingRepository.completeCurrentStep();
     }
 
+    public CookingSessionState goToPreviousStep() {
+        return cookingRepository.goToPreviousStep();
+    }
+
     public CookingSessionState replayCurrentInstruction() {
         return cookingRepository.replayCurrentInstruction();
     }

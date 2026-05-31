@@ -19,6 +19,7 @@
 <string name="home_ai_title">AI Chef gợi ý món từ nguyên liệu có sẵn</string>
 <string name="home_ai_message">Chọn nhanh một món dễ nấu từ kho công thức local.</string>
 <string name="home_scan_ingredients">Gợi ý món nhanh</string>
+<string name="home_suggest_by_ingredients">Gợi ý món theo nguyên liệu có sẵn</string>
 <string name="home_today_suggestions">Gợi ý hôm nay</string>
 <string name="home_popular_recipes">Món phổ biến</string>
 <string name="home_friend_share">Chia sẻ từ bạn bè</string>
@@ -35,14 +36,14 @@
 <string name="back_to_ai_chef">Quay lại AI Chef</string>
 <string name="ai_flow_continue">Ghi nhớ luồng này</string>
 <string name="ingredient_input_title">Nhập nguyên liệu</string>
-<string name="ingredient_input_question">Bạn đang có gì trong bếp?</string>
-<string name="ingredient_input_intro">Thêm nguyên liệu bạn có sẵn, AI Chef sẽ dùng danh sách này để gợi ý món ngon.</string>
-<string name="ingredient_input_hint">VD: Thịt gà, rau muống...</string>
+<string name="ingredient_input_question">Mời bạn nhập xem nguyên liệu của bạn có những gì</string>
+<string name="ingredient_input_intro">Nhập các nguyên liệu đang có, ví dụ: trứng, cà chua, hành lá. Chúng tôi sẽ dựa vào danh sách vừa nhập để gợi ý món ăn phù hợp.</string>
+<string name="ingredient_input_hint">VD: trứng, cà chua, thịt gà...</string>
 <string name="ingredient_suggestions_label">Gợi ý:</string>
 <string name="ingredient_basket_title">Rổ nguyên liệu của bạn</string>
 <string name="ingredient_empty_state">Chưa có nguyên liệu nào</string>
 <string name="ingredient_camera_scan">Quét bằng camera offline\nThêm nhanh Trứng gà, Cà chua, Hành lá vào rổ</string>
-<string name="ingredient_find_recipes">Tìm món phù hợp nhất</string>
+<string name="ingredient_find_recipes">Gợi ý món từ nguyên liệu vừa nhập</string>
 <string name="ingredient_confirm_title">Xác nhận nguyên liệu</string>
 <string name="ingredient_confirm_intro">Chúng tôi đã tìm thấy những nguyên liệu này. Bạn có muốn điều chỉnh gì không?</string>
 <string name="ingredient_confirm_add">＋ Thêm nguyên liệu</string>

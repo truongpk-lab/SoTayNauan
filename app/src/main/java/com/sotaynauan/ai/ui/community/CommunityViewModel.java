@@ -1,6 +1,7 @@
 package com.sotaynauan.ai.ui.community;
 
 import com.sotaynauan.ai.data.model.CommunityState;
+import com.sotaynauan.ai.data.model.Recipe;
 import com.sotaynauan.ai.data.repository.CommunityRepository;
 
 public class CommunityViewModel {
@@ -39,8 +40,12 @@ public class CommunityViewModel {
     }
 
     public CommunityState shareRecipe(String friendId) {
+        return shareRecipe(friendId, null);
+    }
+
+    public CommunityState shareRecipe(String friendId, Recipe recipe) {
         query = "";
-        CommunityState state = repository.shareRecipeWithFriend(friendId);
+        CommunityState state = repository.shareRecipeWithFriend(friendId, recipe);
         status = state.getStatusMessage();
         return state;
     }
@@ -51,8 +56,8 @@ public class CommunityViewModel {
         return state;
     }
 
-    public CommunityState comment(String shareId) {
-        CommunityState state = repository.addComment(shareId);
+    public CommunityState comment(String shareId, String comment) {
+        CommunityState state = repository.addComment(shareId, comment);
         status = state.getStatusMessage();
         return state;
     }

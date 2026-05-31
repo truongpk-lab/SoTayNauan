@@ -37,7 +37,6 @@ import com.sotaynauan.ai.ui.community.CommunityActivity;
 import com.sotaynauan.ai.ui.home.HomeActivity;
 import com.sotaynauan.ai.ui.recipe.RecipeDetailActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingListActivity;
-import com.sotaynauan.ai.ui.voice.VoiceSettingsActivity;
 
 public class ProfileActivity extends Activity {
     private ProfileViewModel viewModel;
@@ -51,7 +50,6 @@ public class ProfileActivity extends Activity {
     private TextView favoriteStatText;
     private TextView friendStatText;
     private TextView statusText;
-    private TextView settingsSummaryText;
     private LinearLayout savedRecipesContainer;
     private LinearLayout menuContainer;
     private ProfileState currentState;
@@ -77,7 +75,6 @@ public class ProfileActivity extends Activity {
         favoriteStatText = findViewById(R.id.profileFavoriteStatText);
         friendStatText = findViewById(R.id.profileFriendStatText);
         statusText = findViewById(R.id.profileStatusText);
-        settingsSummaryText = findViewById(R.id.profileSettingsSummaryText);
         savedRecipesContainer = findViewById(R.id.profileSavedRecipesContainer);
         menuContainer = findViewById(R.id.profileMenuContainer);
         menuAdapter = new ProfileMenuAdapter(this, this::handleMenuClick);
@@ -87,10 +84,18 @@ public class ProfileActivity extends Activity {
     private void bindActions() {
         findViewById(R.id.profileEditButton).setOnClickListener(view -> showEditProfileDialog());
         findViewById(R.id.profileLogoutButton).setOnClickListener(view -> showLogoutDialog());
-        findViewById(R.id.profileNotificationToggle).setOnClickListener(view ->
-                bindState(viewModel.toggleNotifications()));
-        findViewById(R.id.profileCompactToggle).setOnClickListener(view ->
-                bindState(viewModel.toggleCompactMode()));
+        findViewById(R.id.profileCookedStatCard).setOnClickListener(view -> {
+            Intent intent = new Intent(this, RecipeListActivity.class);
+            intent.putExtra(RecipeListActivity.EXTRA_MODE, RecipeListActivity.MODE_COOKED);
+            startActivity(intent);
+        });
+        findViewById(R.id.profileFavoriteStatCard).setOnClickListener(view -> {
+            Intent intent = new Intent(this, RecipeListActivity.class);
+            intent.putExtra(RecipeListActivity.EXTRA_MODE, RecipeListActivity.MODE_FAVORITES);
+            startActivity(intent);
+        });
+        findViewById(R.id.profileFriendStatCard).setOnClickListener(view ->
+                startActivity(new Intent(this, CommunityActivity.class)));
 
         findViewById(R.id.homeTab).setOnClickListener(view ->
                 startActivity(new Intent(this, HomeActivity.class)));
@@ -113,8 +118,6 @@ public class ProfileActivity extends Activity {
         cookedStatText.setText(String.valueOf(state.getCookedCount()));
         favoriteStatText.setText(String.valueOf(state.getFavoriteCount()));
         friendStatText.setText(String.valueOf(state.getFriendCount()));
-        settingsSummaryText.setText((state.isNotificationsEnabled() ? "Thông báo bật" : "Thông báo tắt")
-                + " • " + (state.isCompactModeEnabled() ? "Màn gọn bật" : "Màn gọn tắt"));
         statusText.setText(state.getStatusMessage());
         savedRecipeAdapter.bind(savedRecipesContainer, state.getSavedRecipes());
         menuAdapter.bind(menuContainer, state.getMenuItems());
@@ -132,11 +135,9 @@ public class ProfileActivity extends Activity {
         } else if (ProfileMenuItem.ACTION_FRIENDS.equals(item.getId())) {
             startActivity(new Intent(this, CommunityActivity.class));
         } else if (ProfileMenuItem.ACTION_AI_TASTE.equals(item.getId())) {
-            bindState(viewModel.toggleCompactMode());
-        } else if (ProfileMenuItem.ACTION_VOICE_SETTINGS.equals(item.getId())) {
-            startActivity(new Intent(this, VoiceSettingsActivity.class));
+            startActivity(new Intent(this, AiTasteProfileActivity.class));
         } else if (ProfileMenuItem.ACTION_APP_SETTINGS.equals(item.getId())) {
-            bindState(viewModel.toggleNotifications());
+            startActivity(new Intent(this, AppSettingsActivity.class));
         }
     }
 

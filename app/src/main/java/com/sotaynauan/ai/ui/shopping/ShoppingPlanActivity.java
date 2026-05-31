@@ -46,7 +46,6 @@ public class ShoppingPlanActivity extends Activity {
     private static final String FILTER_MAIN = "Nguyên liệu chính";
     private static final String FILTER_NEED_BUY = "Cần mua";
     private static final String FILTER_AT_HOME = "Đã có ở nhà";
-    private static final String FILTER_SKIPPED = "Bỏ qua";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -144,7 +143,6 @@ public class ShoppingPlanActivity extends Activity {
         addFilterChip(FILTER_MAIN);
         addFilterChip(FILTER_NEED_BUY);
         addFilterChip(FILTER_AT_HOME);
-        addFilterChip(FILTER_SKIPPED);
     }
 
     private void addFilterChip(String label) {
@@ -190,9 +188,6 @@ public class ShoppingPlanActivity extends Activity {
                 filtered.add(item);
             } else if (FILTER_AT_HOME.equals(activeFilter)
                     && item.getStatus() == ShoppingItemStatus.AT_HOME) {
-                filtered.add(item);
-            } else if (FILTER_SKIPPED.equals(activeFilter)
-                    && item.getStatus() == ShoppingItemStatus.SKIPPED) {
                 filtered.add(item);
             }
         }
