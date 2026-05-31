@@ -133,4 +133,48 @@ public class CommunityRepository {
         localDataSource.insertShare(share);
         return loadCommunity("", "Đã gửi công thức " + recipeName + " cho " + friend.name + ".");
     }
+
+    public CommunityState shareRecipesWithFriend(String friendId, List<Recipe> recipes) {
+        CommunityFriendEntity friend = localDataSource.findFriend(friendId);
+        if (friend == null) {
+            return loadCommunity("", "Không tìm thấy bạn bè để chia sẻ.");
+        }
+        if (recipes == null || recipes.isEmpty()) {
+            return loadCommunity("", "Bạn chưa chọn món nào để chia sẻ.");
+        }
+
+        int sharedCount = 0;
+        long now = System.currentTimeMillis();
+        for (Recipe recipe : recipes) {
+            if (recipe == null) {
+                continue;
+            }
+            CommunityShareEntity share = new CommunityShareEntity();
+            share.id = "my-share-" + friendId + "-" + now + "-" + sharedCount;
+            share.friendId = friend.id;
+            share.friendName = "Bạn → " + friend.name;
+            share.recipeId = recipe.getId();
+            share.recipeName = recipe.getName();
+            share.message = String.format(Locale.US,
+                    "Bạn vừa chia sẻ công thức %s cho %s.", recipe.getName(), friend.name);
+            share.likeCount = 0;
+            share.commentCount = 0;
+            share.liked = false;
+            share.saved = false;
+            share.fromMe = true;
+            share.createdAtMillis = now + sharedCount;
+            localDataSource.insertShare(share);
+            sharedCount += 1;
+        }
+
+        if (sharedCount == 0) {
+            return loadCommunity("", "Bạn chưa chọn món nào để chia sẻ.");
+        }
+        friend.sharedRecipeCount += sharedCount;
+        localDataSource.updateFriend(friend);
+        String status = sharedCount == 1
+                ? "Đã gửi 1 công thức cho " + friend.name + "."
+                : "Đã gửi " + sharedCount + " công thức cho " + friend.name + ".";
+        return loadCommunity("", status);
+    }
 }

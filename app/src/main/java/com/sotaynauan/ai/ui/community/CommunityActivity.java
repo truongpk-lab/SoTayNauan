@@ -8,9 +8,11 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.View;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.sotaynauan.ai.R;
@@ -33,6 +35,7 @@ import com.sotaynauan.ai.ui.profile.ProfileActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingListActivity;
 import com.sotaynauan.ai.util.RecipeImageResolver;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class CommunityActivity extends Activity {
@@ -216,68 +219,125 @@ public class CommunityActivity extends Activity {
     }
 
     private void showShareProfile(CommunityFriend friend) {
-        Recipe recipe = pickShareRecipe();
-        if (recipe == null) {
+        List<Recipe> recipes = recipeRepository.getAllRecipes();
+        if (recipes.isEmpty()) {
             statusText.setText("Chưa có công thức nào để chia sẻ.");
             return;
         }
-        new AlertDialog.Builder(this)
-                .setTitle("Chia sẻ với " + friend.getName())
-                .setView(createShareRecipeView(friend, recipe))
+
+        boolean[] selectedRecipes = new boolean[recipes.size()];
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Chọn công thức chia sẻ")
+                .setView(createRecipeSelectionView(recipes, selectedRecipes))
                 .setNegativeButton("Hủy", null)
-                .setPositiveButton("Chia sẻ món", (dialog, which) ->
-                        bindState(viewModel.shareRecipe(friend.getId(), recipe)))
-                .show();
+                .setPositiveButton("Tiếp tục", null)
+                .create();
+        dialog.setOnShowListener(dialogInterface ->
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                    List<Recipe> selected = getSelectedRecipes(recipes, selectedRecipes);
+                    if (selected.isEmpty()) {
+                        statusText.setText("Bạn hãy chọn ít nhất 1 món để chia sẻ.");
+                        return;
+                    }
+                    dialog.dismiss();
+                    showShareConfirmation(friend, selected);
+                }));
+        dialog.show();
     }
 
-    private Recipe pickShareRecipe() {
-        Recipe recipe = recipeRepository.getRandomQuickSuggestion();
-        if (recipe != null) {
-            return recipe;
-        }
-        List<Recipe> recipes = recipeRepository.getAllRecipes();
-        return recipes.isEmpty() ? null : recipes.get(0);
-    }
-
-    private View createShareRecipeView(CommunityFriend friend, Recipe recipe) {
+    private View createRecipeSelectionView(List<Recipe> recipes, boolean[] selectedRecipes) {
+        ScrollView scrollView = new ScrollView(this);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(20), dp(8), dp(20), 0);
+        content.setPadding(dp(18), dp(8), dp(18), dp(4));
+
+        TextView intro = createDialogText("Chọn 1 hoặc nhiều món trong tất cả công thức nấu để gửi.", 15, "#564337");
+        intro.setPadding(0, 0, 0, dp(10));
+        content.addView(intro);
+
+        for (int index = 0; index < recipes.size(); index++) {
+            content.addView(createRecipeSelectionRow(recipes.get(index), index, selectedRecipes));
+        }
+        scrollView.addView(content);
+        return scrollView;
+    }
+
+    private View createRecipeSelectionRow(Recipe recipe, int index, boolean[] selectedRecipes) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(8), 0, dp(8));
 
         ImageView imageView = new ImageView(this);
         imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
         LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(180));
-        imageParams.setMargins(0, 0, 0, dp(14));
-        content.addView(imageView, imageParams);
+                dp(72),
+                dp(72));
+        imageParams.setMargins(0, 0, dp(12), 0);
+        row.addView(imageView, imageParams);
         RecipeImageResolver.apply(imageView, recipe);
 
-        TextView recipeName = createDialogText(recipe.getName(), 20, "#2F170F");
+        LinearLayout textColumn = new LinearLayout(this);
+        textColumn.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f);
+
+        TextView recipeName = createDialogText(recipe.getName(), 16, "#2F170F");
         recipeName.setTypeface(recipeName.getTypeface(), android.graphics.Typeface.BOLD);
-        content.addView(recipeName);
+        textColumn.addView(recipeName);
 
         TextView recipeInfo = createDialogText(
-                recipe.getDescription() + "\n" + recipe.getTotalMinutes() + " phút · " + recipe.getDifficulty(),
-                15,
+                recipe.getTotalMinutes() + " phút · " + recipe.getDifficulty(),
+                13,
                 "#564337");
-        recipeInfo.setPadding(0, dp(6), 0, dp(12));
-        content.addView(recipeInfo);
+        recipeInfo.setPadding(0, dp(4), 0, 0);
+        textColumn.addView(recipeInfo);
+        row.addView(textColumn, textParams);
 
-        TextView confirmText = createDialogText(
-                "Bạn có muốn chia sẻ món " + recipe.getName() + " cho " + friend.getName() + " nhận?",
-                16,
-                "#944A00");
-        confirmText.setTypeface(confirmText.getTypeface(), android.graphics.Typeface.BOLD);
-        content.addView(confirmText);
+        CheckBox checkBox = new CheckBox(this);
+        row.addView(checkBox);
 
-        TextView commonText = createDialogText(
-                "Hai bếp có " + friend.getSharedRecipeCount() + " món ăn chung.",
-                14,
-                "#6D5142");
-        commonText.setPadding(0, dp(8), 0, 0);
-        content.addView(commonText);
-        return content;
+        row.setOnClickListener(view -> {
+            selectedRecipes[index] = !selectedRecipes[index];
+            checkBox.setChecked(selectedRecipes[index]);
+        });
+        checkBox.setOnClickListener(view -> selectedRecipes[index] = checkBox.isChecked());
+        return row;
+    }
+
+    private List<Recipe> getSelectedRecipes(List<Recipe> recipes, boolean[] selectedRecipes) {
+        List<Recipe> selected = new ArrayList<>();
+        for (int index = 0; index < recipes.size(); index++) {
+            if (selectedRecipes[index]) {
+                selected.add(recipes.get(index));
+            }
+        }
+        return selected;
+    }
+
+    private void showShareConfirmation(CommunityFriend friend, List<Recipe> selectedRecipes) {
+        new AlertDialog.Builder(this)
+                .setTitle("Xác nhận chia sẻ")
+                .setMessage("Bạn có muốn chia sẻ " + selectedRecipes.size()
+                        + " món (" + buildSelectedRecipeSummary(selectedRecipes) + ") cho "
+                        + friend.getName() + " nhận?")
+                .setNegativeButton("Quay lại", (dialog, which) -> showShareProfile(friend))
+                .setPositiveButton("Chia sẻ", (dialog, which) ->
+                        bindState(viewModel.shareRecipes(friend.getId(), selectedRecipes)))
+                .show();
+    }
+
+    private String buildSelectedRecipeSummary(List<Recipe> selectedRecipes) {
+        StringBuilder builder = new StringBuilder();
+        for (int index = 0; index < selectedRecipes.size(); index++) {
+            if (index > 0) {
+                builder.append(", ");
+            }
+            builder.append(selectedRecipes.get(index).getName());
+        }
+        return builder.toString();
     }
 
     private TextView createDialogText(String text, int textSizeSp, String colorHex) {

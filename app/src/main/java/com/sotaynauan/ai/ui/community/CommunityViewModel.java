@@ -50,6 +50,13 @@ public class CommunityViewModel {
         return state;
     }
 
+    public CommunityState shareRecipes(String friendId, java.util.List<Recipe> recipes) {
+        query = "";
+        CommunityState state = repository.shareRecipesWithFriend(friendId, recipes);
+        status = state.getStatusMessage();
+        return state;
+    }
+
     public CommunityState like(String shareId) {
         CommunityState state = repository.toggleLike(shareId);
         status = state.getStatusMessage();
