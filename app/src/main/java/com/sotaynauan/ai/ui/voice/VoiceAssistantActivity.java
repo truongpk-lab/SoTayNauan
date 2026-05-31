@@ -198,7 +198,7 @@ public class VoiceAssistantActivity extends Activity {
             kitchenBackground.setImageResource(R.drawable.cooking_step_preview);
             return;
         }
-        kitchenBackground.setImageResource(RecipeImageResolver.resolve(this, recipe));
+        RecipeImageResolver.apply(kitchenBackground, recipe);
         kitchenBackground.setContentDescription(recipe.getName());
     }
 

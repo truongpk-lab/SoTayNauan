@@ -142,7 +142,7 @@ public class AiRecipeSuggestionActivity extends Activity {
         }
         bestMatchCard.setAlpha(1f);
         bestHero.setText(bestMatch.getRecipe().getCategory());
-        bestHeroImage.setImageResource(RecipeImageResolver.resolve(this, bestMatch.getRecipe()));
+        RecipeImageResolver.apply(bestHeroImage, bestMatch.getRecipe());
         bestHeroImage.setContentDescription(bestMatch.getRecipe().getName());
         findViewById(R.id.bestHeroContainer).setBackground(createGradient(bestMatch.getRecipe().getColorArgb(), dp(26)));
         bestRecipeName.setText(bestMatch.getRecipe().getName());

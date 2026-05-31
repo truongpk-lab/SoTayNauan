@@ -54,7 +54,7 @@ public class RecipePreviewActivity extends Activity {
         hero.setText(recipe.getCategory());
         findViewById(R.id.recipeHeroContainer).setBackground(createHeroBackground(recipe.getColorArgb()));
         ImageView heroImage = findViewById(R.id.recipeHeroImage);
-        heroImage.setImageResource(RecipeImageResolver.resolve(this, recipe));
+        RecipeImageResolver.apply(heroImage, recipe);
         heroImage.setContentDescription(recipe.getName());
 
         TextView recipeName = findViewById(R.id.recipeName);

@@ -165,6 +165,22 @@ public class CookingRepository {
         return completeCurrentStep();
     }
 
+    public void saveFinishedPhoto(long recipeId, String photoUri) {
+        localDataSource.saveFinishedPhoto(recipeId, photoUri);
+    }
+
+    public String getFinishedPhoto(long recipeId) {
+        return localDataSource.getFinishedPhoto(recipeId);
+    }
+
+    public void saveFinishedNote(long recipeId, String note) {
+        localDataSource.saveFinishedNote(recipeId, note);
+    }
+
+    public String getFinishedNote(long recipeId) {
+        return localDataSource.getFinishedNote(recipeId);
+    }
+
     private CookingSessionState createState(Recipe recipe, int stepIndex, boolean completed, String statusMessage) {
         return new CookingSessionState(recipe, stepIndex, estimateStepSeconds(recipe, stepIndex),
                 completed, localDataSource.getUpdatedAt(), statusMessage);

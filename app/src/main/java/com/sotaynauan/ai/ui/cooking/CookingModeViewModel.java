@@ -26,4 +26,20 @@ public class CookingModeViewModel {
     public CookingTimerState getTimerState() {
         return cookingRepository.getTimerState();
     }
+
+    public void saveFinishedPhoto(long recipeId, String photoUri) {
+        cookingRepository.saveFinishedPhoto(recipeId, photoUri);
+    }
+
+    public String getFinishedPhoto(long recipeId) {
+        return cookingRepository.getFinishedPhoto(recipeId);
+    }
+
+    public void saveFinishedNote(long recipeId, String note) {
+        cookingRepository.saveFinishedNote(recipeId, note);
+    }
+
+    public String getFinishedNote(long recipeId) {
+        return cookingRepository.getFinishedNote(recipeId);
+    }
 }

@@ -55,9 +55,10 @@ public class HomeActivity extends Activity {
     }
 
     private void openQuickSuggestion() {
-        Recipe recipe = viewModel.loadQuickSuggestion();
+        Recipe recipe = viewModel.loadRandomQuickSuggestion();
         if (recipe != null) {
-            statusText.setText("Đã chọn món nhanh từ kho local: " + recipe.getName());
+            statusText.setText("AI đã random món nhanh từ kho local: " + recipe.getName()
+                    + ". Muốn gợi ý theo nguyên liệu, vào AI Chef và nhập những gì bạn đang có.");
             openRecipe(recipe);
         } else {
             statusText.setText("Kho công thức local chưa có món nhanh phù hợp.");

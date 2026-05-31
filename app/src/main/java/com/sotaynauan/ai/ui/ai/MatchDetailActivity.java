@@ -144,7 +144,7 @@ public class MatchDetailActivity extends Activity {
 
         recipeId = match.getRecipe().getId();
         heroCategory.setText(match.getRecipe().getCategory());
-        heroImage.setImageResource(RecipeImageResolver.resolve(this, match.getRecipe()));
+        RecipeImageResolver.apply(heroImage, match.getRecipe());
         heroImage.setContentDescription(match.getRecipe().getName());
         findViewById(R.id.matchHeroContainer).setBackground(createHeroBackground(match.getRecipe().getColorArgb()));
         recipeName.setText(match.getRecipe().getName());

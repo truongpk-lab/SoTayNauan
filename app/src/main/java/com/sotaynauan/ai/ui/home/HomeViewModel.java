@@ -22,4 +22,8 @@ public class HomeViewModel {
     public Recipe loadQuickSuggestion() {
         return recipeRepository.getQuickSuggestion();
     }
+
+    public Recipe loadRandomQuickSuggestion() {
+        return recipeRepository.getRandomQuickSuggestion();
+    }
 }

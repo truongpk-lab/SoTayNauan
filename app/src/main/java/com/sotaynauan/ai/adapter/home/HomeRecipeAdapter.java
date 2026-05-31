@@ -121,7 +121,7 @@ public class HomeRecipeAdapter {
 
         ImageView image = new ImageView(context);
         image.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        image.setImageResource(RecipeImageResolver.resolve(context, recipe));
+        RecipeImageResolver.apply(image, recipe);
         panel.addView(image, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 

@@ -19,7 +19,7 @@ public interface RecipeDao {
     void insertAll(List<RecipeEntity> recipes);
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    void insert(RecipeEntity recipe);
+    long insert(RecipeEntity recipe);
 
     @Update
     void update(RecipeEntity recipe);
@@ -36,6 +36,9 @@ public interface RecipeDao {
     @Query("SELECT * FROM recipes ORDER BY popularityScore DESC")
     List<RecipeEntity> getAllRecipes();
 
+    @Query("SELECT * FROM recipes WHERE category = 'Công thức của tôi' ORDER BY id DESC")
+    List<RecipeEntity> getUserSavedRecipes();
+
     @Query("SELECT * FROM recipes WHERE friendNote != '' ORDER BY popularityScore DESC")
     List<RecipeEntity> getFriendShares();
 
@@ -44,4 +47,7 @@ public interface RecipeDao {
 
     @Query("SELECT * FROM recipes WHERE totalMinutes <= 20 ORDER BY popularityScore DESC LIMIT 1")
     RecipeEntity findQuickSuggestion();
+
+    @Query("SELECT * FROM recipes WHERE totalMinutes <= 30 ORDER BY RANDOM() LIMIT 1")
+    RecipeEntity findRandomQuickSuggestion();
 }

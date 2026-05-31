@@ -27,6 +27,10 @@ public class RecipeRepository {
         return mapper.toModels(localDataSource.getAllRecipes());
     }
 
+    public java.util.List<Recipe> getUserSavedRecipes() {
+        return mapper.toModels(localDataSource.getUserSavedRecipes());
+    }
+
     public Recipe findRecipe(long recipeId) {
         RecipeEntity entity = localDataSource.findById(recipeId);
         return entity == null ? null : mapper.toModel(entity);
@@ -35,5 +39,24 @@ public class RecipeRepository {
     public Recipe getQuickSuggestion() {
         RecipeEntity entity = localDataSource.findQuickSuggestion();
         return entity == null ? null : mapper.toModel(entity);
+    }
+
+    public Recipe getRandomQuickSuggestion() {
+        RecipeEntity entity = localDataSource.findRandomQuickSuggestion();
+        return entity == null ? null : mapper.toModel(entity);
+    }
+
+    public Recipe addRecipe(String name, String description, int totalMinutes, String difficulty,
+                            String category, String imageName, String serving, String calories,
+                            String cost, java.util.List<String> ingredients,
+                            java.util.List<String> steps) {
+        RecipeEntity entity = mapper.toEntity(name, description, totalMinutes, difficulty,
+                category, imageName, serving, calories, cost, 0xFFC56A2C, 50,
+                false, "", "", ingredients, steps);
+        long id = localDataSource.addRecipe(entity);
+        if (id <= 0L) {
+            return null;
+        }
+        return findRecipe(id);
     }
 }

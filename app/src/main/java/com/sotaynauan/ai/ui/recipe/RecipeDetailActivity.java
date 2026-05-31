@@ -148,7 +148,7 @@ public class RecipeDetailActivity extends Activity {
         heroTitle.setText(recipe.getName());
         heroCategory.setText(recipe.getCategory());
         findViewById(R.id.recipeDetailHero).setBackground(createHeroBackground(recipe.getColorArgb()));
-        heroImage.setImageResource(RecipeImageResolver.resolve(this, recipe));
+        RecipeImageResolver.apply(heroImage, recipe);
         heroImage.setContentDescription(recipe.getName());
         favoriteButton.setText(state.isFavorite() ? "♥" : "♡");
         ratingChip.setText(recipe.getCalories().isEmpty()

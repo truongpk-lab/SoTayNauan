@@ -52,7 +52,7 @@ public class ProfileRepository {
                 displayName,
                 email,
                 cookingLocalDataSource.getCookedCount(),
-                savedRecipes.size(),
+                recipeDetailLocalDataSource.getFavoriteRecipeIds().size(),
                 communityState.getFriends().size(),
                 profileLocalDataSource.isNotificationsEnabled(),
                 profileLocalDataSource.isCompactModeEnabled(),
@@ -115,20 +115,7 @@ public class ProfileRepository {
     }
 
     private List<Recipe> loadSavedRecipes() {
-        List<Recipe> savedRecipes = new ArrayList<>();
-        for (Long recipeId : recipeDetailLocalDataSource.getFavoriteRecipeIds()) {
-            Recipe recipe = recipeRepository.findRecipe(recipeId);
-            if (recipe != null) {
-                savedRecipes.add(recipe);
-            }
-        }
-        if (savedRecipes.isEmpty()) {
-            Recipe quickSuggestion = recipeRepository.getQuickSuggestion();
-            if (quickSuggestion != null) {
-                savedRecipes.add(quickSuggestion);
-            }
-        }
-        return savedRecipes;
+        return new ArrayList<>(recipeRepository.getUserSavedRecipes());
     }
 
     private List<ProfileMenuItem> createMenuItems() {

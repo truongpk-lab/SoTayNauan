@@ -41,6 +41,10 @@ public class AiChefActivity extends Activity {
             startActivity(new Intent(this, IngredientInputActivity.class));
             return;
         }
+        if (AiChefRepository.FLOW_CREATE_RECIPE.equals(feature.getId())) {
+            startActivity(new Intent(this, AddRecipeActivity.class));
+            return;
+        }
         Intent intent = new Intent(this, AiFlowActivity.class);
         intent.putExtra(AiFlowActivity.EXTRA_FEATURE_ID, feature.getId());
         startActivity(intent);

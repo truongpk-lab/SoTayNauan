@@ -1,6 +1,8 @@
 package com.sotaynauan.ai.util;
 
 import android.content.Context;
+import android.net.Uri;
+import android.widget.ImageView;
 
 import com.sotaynauan.ai.R;
 import com.sotaynauan.ai.data.model.Recipe;
@@ -21,6 +23,18 @@ public final class RecipeImageResolver {
         return resolve(context, recipe.getImageName());
     }
 
+    public static void apply(ImageView imageView, Recipe recipe) {
+        if (imageView == null) {
+            return;
+        }
+        String imageName = recipe == null ? "" : recipe.getImageName();
+        if (isUri(imageName)) {
+            imageView.setImageURI(Uri.parse(imageName));
+            return;
+        }
+        imageView.setImageResource(resolve(imageView.getContext(), imageName));
+    }
+
     public static int resolve(Context context, String imageName) {
         if (context == null || imageName == null || imageName.trim().isEmpty()) {
             return FALLBACK_DRAWABLE;
@@ -38,11 +52,16 @@ public final class RecipeImageResolver {
         return context.getResources().getIdentifier(drawableName, "drawable", context.getPackageName());
     }
 
+    public static boolean isUri(String imageName) {
+        return imageName != null
+                && (imageName.startsWith("content://") || imageName.startsWith("file://"));
+    }
+
     private static String sanitizeDrawableName(String imageName) {
         String normalized = imageName.trim().toLowerCase(Locale.US);
         normalized = normalized.replaceAll("[^a-z0-9_]+", "_");
         normalized = normalized.replaceAll("_+", "_");
-        normalized = normalized.replaceAll("^_+|_+$", "");
+        normalized = normalized.replaceAll("^_+", "");
         return normalized;
     }
 }

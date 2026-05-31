@@ -277,8 +277,8 @@ public class AiChefRepository {
                 return Integer.compare(right.getScorePercent(), left.getScorePercent());
             }
         });
-        if (matches.size() > 5) {
-            matches = new ArrayList<>(matches.subList(0, 5));
+        if (matches.size() > 8) {
+            matches = new ArrayList<>(matches.subList(0, 8));
         }
         RecipeMatch bestMatch = matches.isEmpty() ? null : matches.get(0);
         String status = bestMatch == null
@@ -612,7 +612,7 @@ public class AiChefRepository {
         List<AiChefFeature> values = new ArrayList<>();
         values.add(new AiChefFeature(FLOW_INGREDIENT_MATCH,
                 "Gợi ý món từ nguyên liệu",
-                "Nhập những gì bạn có trong tủ lạnh, AI local sẽ dẫn bạn tới bước nhập nguyên liệu.",
+                "Bạn nhập những nguyên liệu đang có, AI local sẽ so khớp với kho công thức.",
                 "MON", Color.parseColor("#E67E22"), true));
         values.add(new AiChefFeature(FLOW_SCAN_INGREDIENTS,
                 "Quét nguyên liệu",
@@ -620,7 +620,7 @@ public class AiChefRepository {
                 "CAM", Color.parseColor("#C46A35"), false));
         values.add(new AiChefFeature(FLOW_CREATE_RECIPE,
                 "Tạo công thức bằng AI",
-                "Lưu lựa chọn sáng tạo công thức theo sở thích bằng logic offline.",
+                "Thêm công thức mới, chụp ảnh món ăn và lưu vào kho local.",
                 "AI", Color.parseColor("#F0A51A"), false));
         values.add(new AiChefFeature(FLOW_WEEKLY_MENU,
                 "Thực đơn tuần",

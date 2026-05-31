@@ -122,10 +122,13 @@ public class ProfileActivity extends Activity {
 
     private void handleMenuClick(ProfileMenuItem item) {
         if (ProfileMenuItem.ACTION_MY_RECIPES.equals(item.getId())) {
-            startActivity(new Intent(this, HomeActivity.class));
+            Intent intent = new Intent(this, RecipeListActivity.class);
+            intent.putExtra(RecipeListActivity.EXTRA_MODE, RecipeListActivity.MODE_ALL);
+            startActivity(intent);
         } else if (ProfileMenuItem.ACTION_FAVORITES.equals(item.getId())) {
-            statusText.setText("Đang hiển thị " + currentState.getFavoriteCount()
-                    + " món đã lưu từ local storage.");
+            Intent intent = new Intent(this, RecipeListActivity.class);
+            intent.putExtra(RecipeListActivity.EXTRA_MODE, RecipeListActivity.MODE_FAVORITES);
+            startActivity(intent);
         } else if (ProfileMenuItem.ACTION_FRIENDS.equals(item.getId())) {
             startActivity(new Intent(this, CommunityActivity.class));
         } else if (ProfileMenuItem.ACTION_AI_TASTE.equals(item.getId())) {

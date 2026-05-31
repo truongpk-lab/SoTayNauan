@@ -33,6 +33,14 @@ public class ProfileSavedRecipeAdapter {
 
     public void bind(LinearLayout container, List<Recipe> recipes) {
         container.removeAllViews();
+        if (recipes.isEmpty()) {
+            TextView empty = text("Chưa có công thức tự lưu. Vào AI Chef > Tạo công thức để thêm món mới.",
+                    14, Color.parseColor("#897365"), false);
+            empty.setPadding(dp(4), dp(6), dp(4), dp(12));
+            container.addView(empty, new LinearLayout.LayoutParams(dp(280),
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            return;
+        }
         for (Recipe recipe : recipes) {
             container.addView(createRecipeCard(recipe));
         }
@@ -77,7 +85,7 @@ public class ProfileSavedRecipeAdapter {
 
         ImageView image = new ImageView(context);
         image.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        image.setImageResource(RecipeImageResolver.resolve(context, recipe));
+        RecipeImageResolver.apply(image, recipe);
         image.setContentDescription(recipe.getName());
         panel.addView(image, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,

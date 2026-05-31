@@ -17,6 +17,8 @@ public class CookingLocalDataSource {
     private static final String KEY_TIMER_STARTED_AT = "timer_started_at";
     private static final String KEY_TIMER_ALARM_ACKNOWLEDGED = "timer_alarm_acknowledged";
     private static final String KEY_COOKED_COUNT = "cooked_count";
+    private static final String KEY_FINISHED_PHOTO_PREFIX = "finished_photo_";
+    private static final String KEY_FINISHED_NOTE_PREFIX = "finished_note_";
 
     private final SharedPreferences preferences;
 
@@ -145,5 +147,27 @@ public class CookingLocalDataSource {
 
     public int getCookedCount() {
         return preferences.getInt(KEY_COOKED_COUNT, 0);
+    }
+
+    public void saveFinishedPhoto(long recipeId, String photoUri) {
+        preferences.edit()
+                .putString(KEY_FINISHED_PHOTO_PREFIX + recipeId, photoUri == null ? "" : photoUri)
+                .putLong(KEY_UPDATED_AT, System.currentTimeMillis())
+                .apply();
+    }
+
+    public String getFinishedPhoto(long recipeId) {
+        return preferences.getString(KEY_FINISHED_PHOTO_PREFIX + recipeId, "");
+    }
+
+    public void saveFinishedNote(long recipeId, String note) {
+        preferences.edit()
+                .putString(KEY_FINISHED_NOTE_PREFIX + recipeId, note == null ? "" : note)
+                .putLong(KEY_UPDATED_AT, System.currentTimeMillis())
+                .apply();
+    }
+
+    public String getFinishedNote(long recipeId) {
+        return preferences.getString(KEY_FINISHED_NOTE_PREFIX + recipeId, "");
     }
 }

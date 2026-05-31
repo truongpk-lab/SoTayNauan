@@ -16,6 +16,9 @@
             android:name=".ui.profile.ProfileActivity"
             android:exported="false" />
         <activity
+            android:name=".ui.profile.RecipeListActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.community.CommunityActivity"
             android:exported="false" />
         <activity
@@ -47,6 +50,9 @@
             android:exported="false" />
         <activity
             android:name=".ui.ai.AiRecipeSuggestionActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.ai.AddRecipeActivity"
             android:exported="false" />
         <activity
             android:name=".ui.ai.IngredientConfirmActivity"

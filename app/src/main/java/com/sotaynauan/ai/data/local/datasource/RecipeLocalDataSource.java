@@ -47,6 +47,11 @@ public class RecipeLocalDataSource {
         return recipeDao.getAllRecipes();
     }
 
+    public List<RecipeEntity> getUserSavedRecipes() {
+        seedIfNeeded();
+        return recipeDao.getUserSavedRecipes();
+    }
+
     public List<RecipeEntity> getFriendShares() {
         seedIfNeeded();
         return recipeDao.getFriendShares();
@@ -60,5 +65,15 @@ public class RecipeLocalDataSource {
     public RecipeEntity findQuickSuggestion() {
         seedIfNeeded();
         return recipeDao.findQuickSuggestion();
+    }
+
+    public RecipeEntity findRandomQuickSuggestion() {
+        seedIfNeeded();
+        return recipeDao.findRandomQuickSuggestion();
+    }
+
+    public long addRecipe(RecipeEntity recipe) {
+        seedIfNeeded();
+        return recipeDao.insert(recipe);
     }
 }

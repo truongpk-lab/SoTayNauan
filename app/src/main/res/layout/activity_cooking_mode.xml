@@ -222,5 +222,78 @@
             android:gravity="center"
             android:textColor="@color/on_surface_variant"
             android:textSize="14sp" />
+
+        <LinearLayout
+            android:id="@+id/cookingFinishedJournal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:background="@drawable/bg_soft_panel"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Ảnh và ghi chú sau khi nấu"
+                android:textColor="@color/on_surface"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/cookingFinishedPhoto"
+                android:layout_width="match_parent"
+                android:layout_height="170dp"
+                android:layout_marginTop="12dp"
+                android:contentDescription="Ảnh món ăn đã nấu xong"
+                android:scaleType="centerCrop"
+                android:src="@drawable/cooking_step_preview" />
+
+            <EditText
+                android:id="@+id/cookingFinishedNote"
+                android:layout_width="match_parent"
+                android:layout_height="104dp"
+                android:layout_marginTop="12dp"
+                android:gravity="top|start"
+                android:hint="Ghi chú: vị món ăn, lần sau cần chỉnh gì..."
+                android:padding="12dp"
+                android:textColor="@color/on_surface"
+                android:textColorHint="@color/on_surface_variant"
+                android:textSize="15sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/cookingCaptureFinishedPhotoButton"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_cooking_secondary_button"
+                    android:text="Chụp ảnh"
+                    android:textAllCaps="false"
+                    android:textColor="@color/primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/cookingSaveFinishedNoteButton"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_primary_button"
+                    android:text="Lưu ghi chú"
+                    android:textAllCaps="false"
+                    android:textColor="@color/on_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

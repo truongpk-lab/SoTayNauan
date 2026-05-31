@@ -88,7 +88,7 @@ public class RecipeMatchAdapter {
 
         ImageView image = new ImageView(context);
         image.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        image.setImageResource(RecipeImageResolver.resolve(context, recipe));
+        RecipeImageResolver.apply(image, recipe);
         image.setContentDescription(recipe.getName());
         panel.addView(image, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,

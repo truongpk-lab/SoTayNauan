@@ -2,9 +2,13 @@ package com.sotaynauan.ai.ui.cooking;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -30,9 +34,12 @@ import com.sotaynauan.ai.ui.voice.VoiceAssistantActivity;
 import com.sotaynauan.ai.util.RecipeImageResolver;
 
 import java.util.Locale;
+import java.io.File;
+import java.io.FileOutputStream;
 
 public class CookingModeActivity extends Activity {
     public static final String EXTRA_RECIPE_ID = "extra_recipe_id";
+    private static final int REQUEST_FINISHED_PHOTO = 84;
 
     private CookingModeViewModel viewModel;
     private CookingStepProgressAdapter stepProgressAdapter;
@@ -44,9 +51,14 @@ public class CookingModeActivity extends Activity {
     private TextView statusText;
     private TextView playPauseButton;
     private Button completeStepButton;
+    private Button captureFinishedPhotoButton;
+    private Button saveFinishedNoteButton;
     private LinearLayout stepsContainer;
+    private LinearLayout finishedJournal;
     private FrameLayout photoFrame;
     private ImageView stepPhoto;
+    private ImageView finishedPhoto;
+    private EditText finishedNote;
     private int stepTotalSeconds;
     private int remainingSeconds;
     private boolean timerRunning;
@@ -70,6 +82,28 @@ public class CookingModeActivity extends Activity {
 
         activeRecipeId = getIntent().getLongExtra(EXTRA_RECIPE_ID, -1L);
         bindSession(viewModel.loadSession(activeRecipeId));
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_FINISHED_PHOTO || resultCode != RESULT_OK || data == null) {
+            return;
+        }
+        Object rawBitmap = data.getExtras() == null ? null : data.getExtras().get("data");
+        if (!(rawBitmap instanceof Bitmap) || currentState == null || !currentState.hasRecipe()) {
+            statusText.setText("Không lấy được ảnh món ăn sau khi nấu.");
+            return;
+        }
+        String photoUri = saveFinishedPhoto((Bitmap) rawBitmap);
+        if (photoUri.isEmpty()) {
+            statusText.setText("Không lưu được ảnh món ăn sau khi nấu.");
+            return;
+        }
+        long recipeId = currentState.getRecipe().getId();
+        viewModel.saveFinishedPhoto(recipeId, photoUri);
+        finishedPhoto.setImageURI(Uri.parse(photoUri));
+        statusText.setText("Đã lưu ảnh thành phẩm cho món " + currentState.getRecipe().getName() + ".");
     }
 
     @Override
@@ -106,9 +140,14 @@ public class CookingModeActivity extends Activity {
         statusText = findViewById(R.id.cookingStatus);
         playPauseButton = findViewById(R.id.cookingPlayPauseButton);
         completeStepButton = findViewById(R.id.cookingCompleteStepButton);
+        captureFinishedPhotoButton = findViewById(R.id.cookingCaptureFinishedPhotoButton);
+        saveFinishedNoteButton = findViewById(R.id.cookingSaveFinishedNoteButton);
         stepsContainer = findViewById(R.id.cookingStepsContainer);
+        finishedJournal = findViewById(R.id.cookingFinishedJournal);
         photoFrame = findViewById(R.id.cookingPhotoFrame);
         stepPhoto = findViewById(R.id.cookingStepPhoto);
+        finishedPhoto = findViewById(R.id.cookingFinishedPhoto);
+        finishedNote = findViewById(R.id.cookingFinishedNote);
     }
 
     private void bindActions() {
@@ -125,6 +164,8 @@ public class CookingModeActivity extends Activity {
         findViewById(R.id.cookingAskTopButton).setOnClickListener(view -> openVoiceAssistant());
         playPauseButton.setOnClickListener(view -> openTimer());
         completeStepButton.setOnClickListener(view -> bindSession(viewModel.completeCurrentStep()));
+        captureFinishedPhotoButton.setOnClickListener(view -> captureFinishedPhoto());
+        saveFinishedNoteButton.setOnClickListener(view -> saveFinishedNote());
     }
 
     private void bindSession(CookingSessionState state) {
@@ -146,12 +187,13 @@ public class CookingModeActivity extends Activity {
             completeStepButton.setEnabled(false);
             playPauseButton.setEnabled(false);
             stepPhoto.setImageResource(R.drawable.cooking_step_preview);
+            finishedJournal.setVisibility(View.GONE);
             updateTimerViews();
             return;
         }
 
         Recipe recipe = state.getRecipe();
-        stepPhoto.setImageResource(RecipeImageResolver.resolve(this, recipe));
+        RecipeImageResolver.apply(stepPhoto, recipe);
         stepPhoto.setContentDescription(recipe.getName());
         titleText.setText(state.isCompleted() ? "Hoàn tất món ăn" : createStepTitle(state.getCurrentStepText()));
         currentStepText.setText(state.isCompleted()
@@ -163,8 +205,25 @@ public class CookingModeActivity extends Activity {
         completeStepButton.setEnabled(!state.isCompleted() && !recipe.getSteps().isEmpty());
         playPauseButton.setEnabled(!state.isCompleted() && stepTotalSeconds > 0);
         photoFrame.setAlpha(state.isCompleted() ? 0.72f : 1f);
+        bindFinishedJournal(state);
         updateTimerViews();
         speakCurrentInstruction(false);
+    }
+
+    private void bindFinishedJournal(CookingSessionState state) {
+        if (!state.hasRecipe() || !state.isCompleted()) {
+            finishedJournal.setVisibility(View.GONE);
+            return;
+        }
+        long recipeId = state.getRecipe().getId();
+        finishedJournal.setVisibility(View.VISIBLE);
+        String photoUri = viewModel.getFinishedPhoto(recipeId);
+        if (photoUri == null || photoUri.trim().isEmpty()) {
+            finishedPhoto.setImageResource(RecipeImageResolver.resolve(this, state.getRecipe()));
+        } else {
+            finishedPhoto.setImageURI(Uri.parse(photoUri));
+        }
+        finishedNote.setText(viewModel.getFinishedNote(recipeId));
     }
 
     private void updateTimerViews() {
@@ -233,6 +292,42 @@ public class CookingModeActivity extends Activity {
         long recipeId = currentState.hasRecipe() ? currentState.getRecipe().getId() : activeRecipeId;
         intent.putExtra(CookingTimerActivity.EXTRA_RECIPE_ID, recipeId);
         startActivity(intent);
+    }
+
+    private void captureFinishedPhoto() {
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (intent.resolveActivity(getPackageManager()) == null) {
+            statusText.setText("Thiết bị chưa có ứng dụng camera để chụp ảnh.");
+            return;
+        }
+        startActivityForResult(intent, REQUEST_FINISHED_PHOTO);
+    }
+
+    private void saveFinishedNote() {
+        if (currentState == null || !currentState.hasRecipe()) {
+            return;
+        }
+        viewModel.saveFinishedNote(currentState.getRecipe().getId(),
+                finishedNote.getText().toString().trim());
+        statusText.setText("Đã lưu ghi chú sau khi nấu cho món "
+                + currentState.getRecipe().getName() + ".");
+    }
+
+    private String saveFinishedPhoto(Bitmap bitmap) {
+        try {
+            File directory = new File(getFilesDir(), "finished_photos");
+            if (!directory.exists() && !directory.mkdirs()) {
+                return "";
+            }
+            File photoFile = new File(directory,
+                    String.format(Locale.US, "finished_%d.jpg", System.currentTimeMillis()));
+            FileOutputStream outputStream = new FileOutputStream(photoFile);
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 92, outputStream);
+            outputStream.close();
+            return Uri.fromFile(photoFile).toString();
+        } catch (Exception exception) {
+            return "";
+        }
     }
 
     private void speakCurrentInstruction(boolean force) {
