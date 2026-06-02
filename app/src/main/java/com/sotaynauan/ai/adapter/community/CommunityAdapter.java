@@ -20,6 +20,7 @@ public class CommunityAdapter {
         void onFriendShare(CommunityFriend friend);
         void onAcceptInvite(CommunityFriend friend);
         void onInviteDiscovery(CommunityFriend friend);
+        void onShareDetail(CommunityShare share);
         void onLikeShare(CommunityShare share);
         void onCommentShare(CommunityShare share);
         void onSaveShare(CommunityShare share);
@@ -86,7 +87,7 @@ public class CommunityAdapter {
         card.addView(textGroup, textParams);
 
         textGroup.addView(title(friend.getName(), 20));
-        textGroup.addView(body("🍴 " + friend.getSharedRecipeCount() + " món ăn chung", 15,
+        textGroup.addView(body("🍴 " + friend.getSharedRecipeCount() + " món chung", 15,
                 Color.parseColor("#564337")));
 
         TextView button = circleButton(action);
@@ -101,6 +102,8 @@ public class CommunityAdapter {
         card.setPadding(dp(16), dp(16), dp(16), dp(14));
         card.setBackground(round(Color.WHITE, dp(22), 0));
         card.setElevation(dp(2));
+        card.setClickable(true);
+        card.setOnClickListener(view -> listener.onShareDetail(share));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         params.setMargins(0, 0, 0, dp(14));

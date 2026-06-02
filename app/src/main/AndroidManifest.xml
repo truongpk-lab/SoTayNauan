@@ -28,6 +28,9 @@
             android:name=".ui.community.CommunityActivity"
             android:exported="false" />
         <activity
+            android:name=".ui.search.SearchActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.voice.VoiceSettingsActivity"
             android:exported="false" />
         <activity

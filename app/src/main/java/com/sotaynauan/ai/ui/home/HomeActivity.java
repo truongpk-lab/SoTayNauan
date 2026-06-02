@@ -18,9 +18,9 @@ import com.sotaynauan.ai.data.repository.RecipeRepository;
 import com.sotaynauan.ai.data.seed.SeedDataProvider;
 import com.sotaynauan.ai.ui.ai.AiChefActivity;
 import com.sotaynauan.ai.ui.ai.IngredientInputActivity;
-import com.sotaynauan.ai.ui.community.CommunityActivity;
 import com.sotaynauan.ai.ui.profile.ProfileActivity;
 import com.sotaynauan.ai.ui.recipe.RecipeDetailActivity;
+import com.sotaynauan.ai.ui.search.SearchActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingListActivity;
 
 public class HomeActivity extends Activity {
@@ -79,7 +79,7 @@ public class HomeActivity extends Activity {
         findViewById(R.id.homeTab).setOnClickListener(view ->
                 statusText.setText("Bạn đang ở trang chủ với dữ liệu recipe local."));
         findViewById(R.id.searchTab).setOnClickListener(view ->
-                startActivity(new Intent(this, CommunityActivity.class)));
+                startActivity(new Intent(this, SearchActivity.class)));
         findViewById(R.id.aiChefTab).setOnClickListener(view ->
                 startActivity(new Intent(this, AiChefActivity.class)));
         findViewById(R.id.shoppingTab).setOnClickListener(view ->

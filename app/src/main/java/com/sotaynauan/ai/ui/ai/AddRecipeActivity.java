@@ -75,6 +75,7 @@ public class AddRecipeActivity extends Activity {
                 statusText.setText("Không lưu được ảnh món ăn đã chọn.");
                 return;
             }
+            showSelectedPreview();
             photoPreview.setImageURI(Uri.parse(photoUri));
             statusText.setText("Đã chọn ảnh món ăn cho công thức mới.");
             return;
@@ -93,6 +94,7 @@ public class AddRecipeActivity extends Activity {
             statusText.setText("Không lưu được ảnh món ăn.");
             return;
         }
+        showSelectedPreview();
         photoPreview.setImageURI(Uri.parse(photoUri));
         statusText.setText("Đã chụp ảnh món ăn cho công thức mới.");
     }
@@ -117,8 +119,7 @@ public class AddRecipeActivity extends Activity {
                 16, getColorCompat(R.color.on_surface_variant), false));
 
         photoPreview = new ImageView(this);
-        photoPreview.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        photoPreview.setImageResource(R.drawable.cooking_step_preview);
+        showPlaceholderPreview();
         LinearLayout.LayoutParams photoParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(190));
         photoParams.setMargins(0, dp(18), 0, dp(12));
@@ -173,6 +174,19 @@ public class AddRecipeActivity extends Activity {
             return;
         }
         startActivityForResult(intent, REQUEST_PICK_PHOTO);
+    }
+
+    private void showPlaceholderPreview() {
+        photoPreview.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        photoPreview.setAdjustViewBounds(true);
+        photoPreview.setBackgroundColor(Color.WHITE);
+        photoPreview.setImageResource(R.drawable.img_gallery);
+    }
+
+    private void showSelectedPreview() {
+        photoPreview.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        photoPreview.setAdjustViewBounds(false);
+        photoPreview.setBackgroundColor(Color.TRANSPARENT);
     }
 
     private void saveRecipe() {

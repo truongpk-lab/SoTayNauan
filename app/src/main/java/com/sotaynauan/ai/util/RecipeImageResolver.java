@@ -10,7 +10,7 @@ import com.sotaynauan.ai.data.model.Recipe;
 import java.util.Locale;
 
 public final class RecipeImageResolver {
-    private static final int FALLBACK_DRAWABLE = R.drawable.cooking_step_preview;
+    private static final int FALLBACK_DRAWABLE = R.drawable.img_gallery;
 
     private RecipeImageResolver() {
         // Utility class.

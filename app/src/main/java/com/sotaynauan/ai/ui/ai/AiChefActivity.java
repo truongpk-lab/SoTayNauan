@@ -11,9 +11,9 @@ import com.sotaynauan.ai.data.local.datasource.AiChefLocalDataSource;
 import com.sotaynauan.ai.data.model.AiChefFeature;
 import com.sotaynauan.ai.data.model.AiChefState;
 import com.sotaynauan.ai.data.repository.AiChefRepository;
-import com.sotaynauan.ai.ui.community.CommunityActivity;
 import com.sotaynauan.ai.ui.home.HomeActivity;
 import com.sotaynauan.ai.ui.profile.ProfileActivity;
+import com.sotaynauan.ai.ui.search.SearchActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingListActivity;
 
 public class AiChefActivity extends Activity {
@@ -66,7 +66,7 @@ public class AiChefActivity extends Activity {
             finish();
         });
         findViewById(R.id.searchTab).setOnClickListener(view ->
-                startActivity(new Intent(this, CommunityActivity.class)));
+                startActivity(new Intent(this, SearchActivity.class)));
         findViewById(R.id.aiChefTab).setOnClickListener(view -> bindState(viewModel.loadState()));
         findViewById(R.id.shoppingTab).setOnClickListener(view ->
                 startActivity(new Intent(this, ShoppingListActivity.class)));

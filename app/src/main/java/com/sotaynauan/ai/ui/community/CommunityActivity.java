@@ -7,6 +7,7 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -32,21 +33,32 @@ import com.sotaynauan.ai.data.seed.SeedDataProvider;
 import com.sotaynauan.ai.ui.ai.AiChefActivity;
 import com.sotaynauan.ai.ui.home.HomeActivity;
 import com.sotaynauan.ai.ui.profile.ProfileActivity;
+import com.sotaynauan.ai.ui.recipe.RecipeDetailActivity;
+import com.sotaynauan.ai.ui.search.SearchActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingListActivity;
 import com.sotaynauan.ai.util.RecipeImageResolver;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 public class CommunityActivity extends Activity {
+    public static final String EXTRA_FRIEND_ID = "extra_friend_id";
+
     private static final String TAB_FRIENDS = "friends";
     private static final String TAB_INVITES = "invites";
     private static final String TAB_DISCOVER = "discover";
 
     private CommunityViewModel viewModel;
+    private CommunityRepository communityRepository;
     private RecipeRepository recipeRepository;
     private CommunityAdapter adapter;
+    private CommunityState currentState;
     private String activeTab = TAB_FRIENDS;
+    private String pendingFriendId;
 
     private TextView statusText;
     private TextView emptyText;
@@ -61,12 +73,14 @@ public class CommunityActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_community);
 
+        pendingFriendId = getIntent().getStringExtra(EXTRA_FRIEND_ID);
         recipeRepository = createRecipeRepository();
-        viewModel = new CommunityViewModel(new CommunityRepository(
+        communityRepository = new CommunityRepository(
                 new CommunityLocalDataSource(
                         AppDatabase.getInstance(this).communityDao(),
                         new SeedDataProvider()),
-                new CommunityMapper()));
+                new CommunityMapper());
+        viewModel = new CommunityViewModel(communityRepository);
         adapter = new CommunityAdapter(this, new CommunityAdapter.Listener() {
             @Override
             public void onFriendProfile(CommunityFriend friend) {
@@ -88,6 +102,11 @@ public class CommunityActivity extends Activity {
             public void onInviteDiscovery(CommunityFriend friend) {
                 activeTab = TAB_INVITES;
                 bindState(viewModel.inviteDiscovery(friend.getId()));
+            }
+
+            @Override
+            public void onShareDetail(CommunityShare share) {
+                showSharedRecipeHistory(share);
             }
 
             @Override
@@ -135,7 +154,7 @@ public class CommunityActivity extends Activity {
         findViewById(R.id.inviteMemberButton).setOnClickListener(view -> {
             activeTab = TAB_DISCOVER;
             bindState(viewModel.load());
-            statusText.setText("Chọn một bếp nhà trong Khám phá để gửi lời mời local.");
+            statusText.setText("Chọn một người trong tab Khám phá để gửi lời mời local.");
         });
         friendsTab.setOnClickListener(view -> {
             activeTab = TAB_FRIENDS;
@@ -149,6 +168,7 @@ public class CommunityActivity extends Activity {
             activeTab = TAB_DISCOVER;
             bindState(viewModel.load());
         });
+
         EditText searchInput = findViewById(R.id.communitySearchInput);
         searchInput.addTextChangedListener(new TextWatcher() {
             @Override
@@ -169,7 +189,7 @@ public class CommunityActivity extends Activity {
         findViewById(R.id.homeTab).setOnClickListener(view ->
                 startActivity(new Intent(this, HomeActivity.class)));
         findViewById(R.id.searchTab).setOnClickListener(view ->
-                statusText.setText("Ô tìm kiếm phía trên đang lọc bạn bè và bài chia sẻ local."));
+                startActivity(new Intent(this, SearchActivity.class)));
         findViewById(R.id.aiChefTab).setOnClickListener(view ->
                 startActivity(new Intent(this, AiChefActivity.class)));
         findViewById(R.id.shoppingTab).setOnClickListener(view ->
@@ -179,6 +199,7 @@ public class CommunityActivity extends Activity {
     }
 
     private void bindState(CommunityState state) {
+        currentState = state;
         statusText.setText(state.getStatusMessage());
         bindTabs(state);
         if (TAB_INVITES.equals(activeTab)) {
@@ -192,6 +213,7 @@ public class CommunityActivity extends Activity {
             emptyText.setVisibility(state.getFriends().isEmpty() ? View.VISIBLE : View.GONE);
         }
         adapter.bindShares(shareFeedContainer, state.getShares());
+        openPendingFriendProfile();
     }
 
     private void bindTabs(CommunityState state) {
@@ -210,12 +232,265 @@ public class CommunityActivity extends Activity {
     private void showFriendProfile(CommunityFriend friend) {
         new AlertDialog.Builder(this)
                 .setTitle(friend.getName())
-                .setMessage(friend.getEmail() + "\n\n" + friend.getNote()
-                        + "\n\n" + friend.getSharedRecipeCount() + " món ăn chung trong cộng đồng local.")
+                .setView(createFriendProfileView(friend))
                 .setNegativeButton("Đóng", null)
-                .setPositiveButton("Chia sẻ món", (dialog, which) ->
-                        showShareProfile(friend))
+                .setPositiveButton("Chia sẻ món", (dialog, which) -> showShareProfile(friend))
                 .show();
+    }
+
+    private View createFriendProfileView(CommunityFriend friend) {
+        ScrollView scrollView = new ScrollView(this);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(20), dp(12), dp(20), dp(8));
+        scrollView.addView(content);
+
+        TextView emailView = createDialogText(friend.getEmail(), 15, "#564337");
+        content.addView(emailView);
+
+        TextView noteView = createDialogText(friend.getNote(), 15, "#2F170F");
+        noteView.setPadding(0, dp(8), 0, 0);
+        content.addView(noteView);
+
+        addRecipeSection(content, "Món đang chung với bạn", buildCommonRecipes(friend),
+                "Chưa có món chung cụ thể với người này.");
+        addRecipeSection(content, "Tất cả công thức người này đang có", buildFriendRecipes(friend),
+                "Hiện chưa có công thức nào của người này trong kho local.");
+        addRecipeSection(content, "Món bạn đã chia sẻ", buildSentRecipes(friend),
+                "Bạn chưa chia sẻ món nào cho người này.");
+        return scrollView;
+    }
+
+    private void addRecipeSection(LinearLayout parent, String title, List<Recipe> recipes, String emptyMessage) {
+        TextView titleView = createDialogText(title, 17, "#2F170F");
+        titleView.setTypeface(titleView.getTypeface(), android.graphics.Typeface.BOLD);
+        titleView.setPadding(0, dp(18), 0, dp(8));
+        parent.addView(titleView);
+
+        if (recipes.isEmpty()) {
+            TextView emptyView = createDialogText(emptyMessage, 14, "#7A6558");
+            parent.addView(emptyView);
+            return;
+        }
+
+        for (Recipe recipe : recipes) {
+            parent.addView(createRecipeCard(recipe));
+        }
+    }
+
+    private View createRecipeCard(Recipe recipe) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setBackgroundResource(R.drawable.bg_voice_settings_card);
+        card.setPadding(dp(12), dp(12), dp(12), dp(12));
+        card.setClickable(true);
+        card.setOnClickListener(view -> openRecipeDetail(recipe));
+
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        cardParams.setMargins(0, 0, 0, dp(10));
+        card.setLayoutParams(cardParams);
+
+        ImageView imageView = new ImageView(this);
+        imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(dp(76), dp(76));
+        imageParams.setMargins(0, 0, dp(12), 0);
+        card.addView(imageView, imageParams);
+        RecipeImageResolver.apply(imageView, recipe);
+
+        LinearLayout textColumn = new LinearLayout(this);
+        textColumn.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        card.addView(textColumn, textParams);
+
+        TextView nameView = createDialogText(recipe.getName(), 16, "#2F170F");
+        nameView.setTypeface(nameView.getTypeface(), android.graphics.Typeface.BOLD);
+        textColumn.addView(nameView);
+
+        TextView metaView = createDialogText(
+                recipe.getCategory() + " • " + recipe.getDifficulty() + " • " + recipe.getTotalMinutes() + " phút",
+                13,
+                "#944A00");
+        metaView.setPadding(0, dp(4), 0, 0);
+        textColumn.addView(metaView);
+
+        TextView descriptionView = createDialogText(recipe.getDescription(), 13, "#564337");
+        descriptionView.setPadding(0, dp(6), 0, 0);
+        textColumn.addView(descriptionView);
+
+        TextView actionView = createDialogText("Mở", 12, "#944A00");
+        actionView.setTypeface(actionView.getTypeface(), android.graphics.Typeface.BOLD);
+        actionView.setGravity(Gravity.CENTER);
+        actionView.setBackgroundColor(Color.TRANSPARENT);
+        card.addView(actionView);
+        return card;
+    }
+
+    private void showSharedRecipeHistory(CommunityShare share) {
+        CommunityFriend friend = findFriendById(share.getFriendId());
+        String title = friend == null ? share.getFriendName() : friend.getName();
+        List<Recipe> sharedRecipes = friend == null
+                ? buildSentRecipes(share.getFriendId(), share.getFriendName())
+                : buildSentRecipes(friend);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setView(createRecipeHistoryView(sharedRecipes,
+                        "Bạn chưa chia sẻ món nào cho người này.",
+                        share.getMessage()))
+                .setNegativeButton("Đóng", null);
+        if (friend != null) {
+            builder.setPositiveButton("Chia sẻ thêm", (dialog, which) -> showShareProfile(friend));
+        }
+        builder.show();
+    }
+
+    private View createRecipeHistoryView(List<Recipe> recipes, String emptyMessage, String introMessage) {
+        ScrollView scrollView = new ScrollView(this);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(20), dp(12), dp(20), dp(8));
+        scrollView.addView(content);
+
+        if (introMessage != null && !introMessage.trim().isEmpty()) {
+            TextView introView = createDialogText(introMessage, 15, "#2F170F");
+            introView.setPadding(0, 0, 0, dp(12));
+            content.addView(introView);
+        }
+
+        addRecipeSection(content, "Chi tiết món đã chia sẻ", recipes, emptyMessage);
+        return scrollView;
+    }
+
+    private List<Recipe> buildCommonRecipes(CommunityFriend friend) {
+        LinkedHashMap<String, Recipe> recipes = new LinkedHashMap<>();
+        addRecipesFromShares(recipes, friend.getId(), false, null);
+        if (recipes.isEmpty()) {
+            addRecipesFromFriendProfile(recipes, friend);
+        }
+        return new ArrayList<>(recipes.values());
+    }
+
+    private List<Recipe> buildFriendRecipes(CommunityFriend friend) {
+        LinkedHashMap<String, Recipe> recipes = new LinkedHashMap<>();
+        addRecipesFromFriendProfile(recipes, friend);
+        addRecipesFromShares(recipes, friend.getId(), false, null);
+        return new ArrayList<>(recipes.values());
+    }
+
+    private List<Recipe> buildSentRecipes(CommunityFriend friend) {
+        return buildSentRecipes(friend.getId(), friend.getName());
+    }
+
+    private List<Recipe> buildSentRecipes(String friendId, String friendName) {
+        LinkedHashMap<String, Recipe> recipes = new LinkedHashMap<>();
+        addRecipesFromShares(recipes, friendId, true, friendName);
+        return new ArrayList<>(recipes.values());
+    }
+
+    private void addRecipesFromFriendProfile(Map<String, Recipe> recipes, CommunityFriend friend) {
+        String normalizedFriendName = normalize(friend.getName());
+        for (Recipe recipe : recipeRepository.getAllRecipes()) {
+            if (!normalize(recipe.getFriendName()).equals(normalizedFriendName)) {
+                continue;
+            }
+            recipes.putIfAbsent(normalize(recipe.getName()), recipe);
+        }
+    }
+
+    private void addRecipesFromShares(Map<String, Recipe> recipes, String friendId, boolean fromMeOnly,
+                                      String fallbackFriendName) {
+        for (CommunityShare share : loadAllCommunityState().getShares()) {
+            if (share == null || !isShareForFriend(share, friendId, fallbackFriendName)) {
+                continue;
+            }
+            if (fromMeOnly && !share.isFromMe()) {
+                continue;
+            }
+            Recipe recipe = resolveRecipe(share.getRecipeId(), share.getRecipeName());
+            if (recipe == null) {
+                continue;
+            }
+            recipes.putIfAbsent(normalize(recipe.getName()), recipe);
+        }
+    }
+
+    private boolean isShareForFriend(CommunityShare share, String friendId, String fallbackFriendName) {
+        if (share.getFriendId() != null && share.getFriendId().equals(friendId)) {
+            return true;
+        }
+        return fallbackFriendName != null
+                && !fallbackFriendName.trim().isEmpty()
+                && normalize(share.getFriendName()).contains(normalize(fallbackFriendName));
+    }
+
+    private Recipe resolveRecipe(long recipeId, String recipeName) {
+        if (recipeId > 0L) {
+            Recipe recipe = recipeRepository.findRecipe(recipeId);
+            if (recipe != null) {
+                return recipe;
+            }
+        }
+        for (Recipe recipe : recipeRepository.getAllRecipes()) {
+            if (normalize(recipe.getName()).equals(normalize(recipeName))) {
+                return recipe;
+            }
+        }
+        return null;
+    }
+
+    private CommunityFriend findFriendById(String friendId) {
+        if (friendId == null || friendId.trim().isEmpty()) {
+            return null;
+        }
+        CommunityState state = loadAllCommunityState();
+        for (CommunityFriend friend : state.getFriends()) {
+            if (friendId.equals(friend.getId())) {
+                return friend;
+            }
+        }
+        for (CommunityFriend friend : state.getInvites()) {
+            if (friendId.equals(friend.getId())) {
+                return friend;
+            }
+        }
+        for (CommunityFriend friend : state.getDiscoveries()) {
+            if (friendId.equals(friend.getId())) {
+                return friend;
+            }
+        }
+        return null;
+    }
+
+    private CommunityState loadAllCommunityState() {
+        String currentStatus = currentState == null ? "" : currentState.getStatusMessage();
+        return communityRepository.loadCommunity("", currentStatus);
+    }
+
+    private void openPendingFriendProfile() {
+        if (pendingFriendId == null || pendingFriendId.trim().isEmpty()) {
+            return;
+        }
+        CommunityFriend friend = findFriendById(pendingFriendId);
+        pendingFriendId = null;
+        if (friend != null) {
+            showFriendProfile(friend);
+        }
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return "";
+        }
+        String normalized = Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
+                .replace('đ', 'd')
+                .replace('Đ', 'D')
+                .toLowerCase(Locale.US);
+        return normalized.trim().replaceAll("\\s+", " ");
     }
 
     private void showShareProfile(CommunityFriend friend) {
@@ -251,7 +526,10 @@ public class CommunityActivity extends Activity {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(18), dp(8), dp(18), dp(4));
 
-        TextView intro = createDialogText("Chọn 1 hoặc nhiều món trong tất cả công thức nấu để gửi.", 15, "#564337");
+        TextView intro = createDialogText(
+                "Chọn 1 hoặc nhiều món trong tất cả công thức nấu để gửi.",
+                15,
+                "#564337");
         intro.setPadding(0, 0, 0, dp(10));
         content.addView(intro);
 
@@ -265,14 +543,12 @@ public class CommunityActivity extends Activity {
     private View createRecipeSelectionRow(Recipe recipe, int index, boolean[] selectedRecipes) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(0, dp(8), 0, dp(8));
 
         ImageView imageView = new ImageView(this);
         imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(
-                dp(72),
-                dp(72));
+        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(dp(72), dp(72));
         imageParams.setMargins(0, 0, dp(12), 0);
         row.addView(imageView, imageParams);
         RecipeImageResolver.apply(imageView, recipe);
@@ -370,7 +646,13 @@ public class CommunityActivity extends Activity {
                 .show();
     }
 
+    private void openRecipeDetail(Recipe recipe) {
+        Intent intent = new Intent(this, RecipeDetailActivity.class);
+        intent.putExtra(RecipeDetailActivity.EXTRA_RECIPE_ID, recipe.getId());
+        startActivity(intent);
+    }
+
     private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 }

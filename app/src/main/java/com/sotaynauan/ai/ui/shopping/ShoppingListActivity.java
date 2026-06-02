@@ -28,6 +28,7 @@ import com.sotaynauan.ai.ui.ai.AiChefActivity;
 import com.sotaynauan.ai.ui.community.CommunityActivity;
 import com.sotaynauan.ai.ui.home.HomeActivity;
 import com.sotaynauan.ai.ui.profile.ProfileActivity;
+import com.sotaynauan.ai.ui.search.SearchActivity;
 
 import java.text.DateFormat;
 import java.util.ArrayList;
@@ -103,7 +104,7 @@ public class ShoppingListActivity extends Activity {
         findViewById(R.id.homeTab).setOnClickListener(view ->
                 startActivity(new Intent(this, HomeActivity.class)));
         findViewById(R.id.searchTab).setOnClickListener(view ->
-                startActivity(new Intent(this, CommunityActivity.class)));
+                startActivity(new Intent(this, SearchActivity.class)));
         findViewById(R.id.aiChefTab).setOnClickListener(view ->
                 startActivity(new Intent(this, AiChefActivity.class)));
         findViewById(R.id.shoppingTab).setOnClickListener(view -> bindState(viewModel.loadList()));
