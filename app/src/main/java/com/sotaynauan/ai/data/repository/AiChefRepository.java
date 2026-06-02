@@ -2,7 +2,10 @@ package com.sotaynauan.ai.data.repository;
 
 import android.graphics.Color;
 
+import com.sotaynauan.ai.data.local.database.AppDatabase;
 import com.sotaynauan.ai.data.local.datasource.AiChefLocalDataSource;
+import com.sotaynauan.ai.data.local.entity.IngredientEntity;
+import com.sotaynauan.ai.data.local.entity.PantryStockEntity;
 import com.sotaynauan.ai.data.model.AiChefFeature;
 import com.sotaynauan.ai.data.model.AiRecipeSuggestionState;
 import com.sotaynauan.ai.data.model.AiChefState;
@@ -14,6 +17,9 @@ import com.sotaynauan.ai.data.model.Recipe;
 import com.sotaynauan.ai.data.model.RecipeMatch;
 import com.sotaynauan.ai.data.model.ShoppingPlanState;
 import com.sotaynauan.ai.data.remote.AiBackendRemoteDataSource;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,6 +40,7 @@ public class AiChefRepository {
     private final AiChefLocalDataSource localDataSource;
     private final RecipeRepository recipeRepository;
     private final AiBackendRemoteDataSource aiBackendRemoteDataSource;
+    private final AppDatabase database;
     private final List<AiChefFeature> features;
 
     public AiChefRepository(AiChefLocalDataSource localDataSource) {
@@ -47,9 +54,17 @@ public class AiChefRepository {
     public AiChefRepository(AiChefLocalDataSource localDataSource,
                             RecipeRepository recipeRepository,
                             AiBackendRemoteDataSource aiBackendRemoteDataSource) {
+        this(localDataSource, recipeRepository, aiBackendRemoteDataSource, null);
+    }
+
+    public AiChefRepository(AiChefLocalDataSource localDataSource,
+                            RecipeRepository recipeRepository,
+                            AiBackendRemoteDataSource aiBackendRemoteDataSource,
+                            AppDatabase database) {
         this.localDataSource = localDataSource;
         this.recipeRepository = recipeRepository;
         this.aiBackendRemoteDataSource = aiBackendRemoteDataSource;
+        this.database = database;
         this.features = createFeatures();
     }
 
@@ -304,7 +319,8 @@ public class AiChefRepository {
         }
         try {
             String advice = aiBackendRemoteDataSource.generateRecipeAdvice(
-                    localState.getSelectedIngredients(), localState.getMatches());
+                    localState.getSelectedIngredients(), localState.getMatches(),
+                    createPantryItemsForAi());
             localDataSource.saveLastAiAdvice(advice);
             return new AiRecipeSuggestionState(localState.getSelectedIngredients(),
                     localState.getMatches(), "AI backend gợi ý: " + advice);
@@ -400,6 +416,30 @@ public class AiChefRepository {
         }
         return new RecipeMatch(recipe, percent, available, missing, label,
                 localDataSource.isFavoriteRecipe(recipe.getId()));
+    }
+
+    private List<JSONObject> createPantryItemsForAi() {
+        List<JSONObject> rows = new ArrayList<>();
+        if (database == null) {
+            return rows;
+        }
+        try {
+            for (PantryStockEntity stock : database.pantryDao().getAllStocks()) {
+                double available = Math.max(0d, stock.totalAmount - stock.reservedAmount);
+                if (available <= 0.0001d) {
+                    continue;
+                }
+                IngredientEntity ingredient = database.ingredientDao().findById(stock.ingredientId);
+                rows.add(new JSONObject()
+                        .put("ingredientId", stock.ingredientId)
+                        .put("name", ingredient == null ? stock.ingredientId : ingredient.name)
+                        .put("availableAmount", available)
+                        .put("unit", stock.baseUnit));
+            }
+        } catch (JSONException exception) {
+            return new ArrayList<>();
+        }
+        return rows;
     }
 
     private String createAiExplanation(RecipeMatch match) {

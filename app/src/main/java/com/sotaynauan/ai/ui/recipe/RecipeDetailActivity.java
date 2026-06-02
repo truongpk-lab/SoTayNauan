@@ -27,6 +27,7 @@ import com.sotaynauan.ai.data.repository.RecipeDetailRepository;
 import com.sotaynauan.ai.data.repository.RecipeRepository;
 import com.sotaynauan.ai.data.repository.ShoppingRepository;
 import com.sotaynauan.ai.data.seed.SeedDataProvider;
+import com.sotaynauan.ai.ui.cooking.CookingPreparationActivity;
 import com.sotaynauan.ai.ui.cooking.CookingModeActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingPlanActivity;
 import com.sotaynauan.ai.util.RecipeImageResolver;
@@ -57,6 +58,7 @@ public class RecipeDetailActivity extends Activity {
     private LinearLayout ingredientContainer;
     private LinearLayout stepContainer;
     private Button shoppingButton;
+    private Button prepareButton;
     private Button startCookingButton;
 
     @Override
@@ -110,6 +112,7 @@ public class RecipeDetailActivity extends Activity {
         ingredientContainer = findViewById(R.id.recipeDetailIngredientContainer);
         stepContainer = findViewById(R.id.recipeDetailStepContainer);
         shoppingButton = findViewById(R.id.recipeDetailShoppingButton);
+        prepareButton = findViewById(R.id.recipeDetailPrepareButton);
         startCookingButton = findViewById(R.id.recipeDetailStartCookingButton);
     }
 
@@ -120,15 +123,15 @@ public class RecipeDetailActivity extends Activity {
             bindState(viewModel.addIngredientsToShopping(recipeId));
             startActivity(new Intent(this, ShoppingPlanActivity.class));
         });
+        prepareButton.setOnClickListener(view -> {
+            Intent intent = new Intent(this, CookingPreparationActivity.class);
+            intent.putExtra(CookingPreparationActivity.EXTRA_RECIPE_ID, recipeId);
+            startActivity(intent);
+        });
         startCookingButton.setOnClickListener(view -> {
-            CookingSessionState sessionState = viewModel.startCooking(recipeId);
-            if (sessionState.hasRecipe()) {
-                Intent intent = new Intent(this, CookingModeActivity.class);
-                intent.putExtra(CookingModeActivity.EXTRA_RECIPE_ID, recipeId);
-                startActivity(intent);
-            } else {
-                statusText.setText(sessionState.getStatusMessage());
-            }
+            Intent intent = new Intent(this, CookingPreparationActivity.class);
+            intent.putExtra(CookingPreparationActivity.EXTRA_RECIPE_ID, recipeId);
+            startActivity(intent);
         });
     }
 
@@ -138,6 +141,7 @@ public class RecipeDetailActivity extends Activity {
         if (!state.hasRecipe()) {
             startCookingButton.setEnabled(false);
             shoppingButton.setEnabled(false);
+            prepareButton.setEnabled(false);
             favoriteButton.setEnabled(false);
             heroTitle.setText("Không tìm thấy công thức");
             return;
@@ -165,6 +169,7 @@ public class RecipeDetailActivity extends Activity {
         stepAdapter.bind(stepContainer, recipe.getSteps());
         startCookingButton.setEnabled(true);
         shoppingButton.setEnabled(true);
+        prepareButton.setEnabled(true);
         favoriteButton.setEnabled(true);
     }
 

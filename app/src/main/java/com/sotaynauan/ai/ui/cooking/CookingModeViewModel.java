@@ -15,6 +15,10 @@ public class CookingModeViewModel {
         return cookingRepository.getActiveSession(fallbackRecipeId);
     }
 
+    public CookingSessionState startSession(long recipeId, String planId) {
+        return cookingRepository.startSession(recipeId, planId);
+    }
+
     public CookingSessionState completeCurrentStep() {
         return cookingRepository.completeCurrentStep();
     }

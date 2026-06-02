@@ -15,6 +15,7 @@ public class CookingRepository {
     private final CookingLocalDataSource localDataSource;
     private final RecipeRepository recipeRepository;
     private final ShoppingRepository shoppingRepository;
+    private final CookingPreparationRepository cookingPreparationRepository;
 
     public CookingRepository(CookingLocalDataSource localDataSource,
                              RecipeRepository recipeRepository) {
@@ -24,13 +25,25 @@ public class CookingRepository {
     public CookingRepository(CookingLocalDataSource localDataSource,
                              RecipeRepository recipeRepository,
                              ShoppingRepository shoppingRepository) {
+        this(localDataSource, recipeRepository, shoppingRepository, null);
+    }
+
+    public CookingRepository(CookingLocalDataSource localDataSource,
+                             RecipeRepository recipeRepository,
+                             ShoppingRepository shoppingRepository,
+                             CookingPreparationRepository cookingPreparationRepository) {
         this.localDataSource = localDataSource;
         this.recipeRepository = recipeRepository;
         this.shoppingRepository = shoppingRepository;
+        this.cookingPreparationRepository = cookingPreparationRepository;
     }
 
     public CookingSessionState startSession(long recipeId) {
-        localDataSource.startSession(recipeId);
+        return startSession(recipeId, "");
+    }
+
+    public CookingSessionState startSession(long recipeId, String planId) {
+        localDataSource.startSession(recipeId, planId);
         Recipe recipe = recipeRepository.findRecipe(recipeId);
         return createState(recipe, 0, false,
                 recipe == null
@@ -66,13 +79,23 @@ public class CookingRepository {
         if (completed) {
             nextIndex = Math.max(0, recipe.getSteps().size() - 1);
         }
-        localDataSource.updateStep(nextIndex, completed);
         String inventoryMessage = "";
-        if (completed && shoppingRepository != null) {
+        if (completed && cookingPreparationRepository != null
+                && localDataSource.getActivePlanId() != null
+                && !localDataSource.getActivePlanId().trim().isEmpty()) {
+            try {
+                cookingPreparationRepository.completeCooking(localDataSource.getActivePlanId());
+                inventoryMessage = " Kho nguyên liệu đã được trừ bằng Room transaction.";
+            } catch (Exception exception) {
+                return createState(recipe, currentIndex, false,
+                        "Không thể hoàn tất nấu vì kho chưa hợp lệ: " + exception.getMessage());
+            }
+        } else if (completed && shoppingRepository != null) {
             inventoryMessage = " " + shoppingRepository
                     .consumeIngredientsForCookedRecipe(recipe.getIngredients(), recipe.getName())
                     .getStatusMessage();
         }
+        localDataSource.updateStep(nextIndex, completed);
         return createState(recipe, nextIndex, completed,
                 completed
                         ? "Bạn đã hoàn thành tất cả các bước." + inventoryMessage

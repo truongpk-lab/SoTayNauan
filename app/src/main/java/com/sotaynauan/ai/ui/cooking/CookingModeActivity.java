@@ -25,6 +25,7 @@ import com.sotaynauan.ai.data.mapper.RecipeMapper;
 import com.sotaynauan.ai.data.model.CookingSessionState;
 import com.sotaynauan.ai.data.model.CookingTimerState;
 import com.sotaynauan.ai.data.model.Recipe;
+import com.sotaynauan.ai.data.repository.CookingPreparationRepository;
 import com.sotaynauan.ai.data.repository.CookingRepository;
 import com.sotaynauan.ai.data.repository.RecipeRepository;
 import com.sotaynauan.ai.data.repository.ShoppingRepository;
@@ -68,6 +69,7 @@ public class CookingModeActivity extends Activity {
     private VoiceLocalDataSource voiceLocalDataSource;
     private VoiceSpeaker voiceSpeaker;
     private String lastAutoSpokenKey = "";
+    private String activePlanId = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -82,7 +84,12 @@ public class CookingModeActivity extends Activity {
         bindActions();
 
         activeRecipeId = getIntent().getLongExtra(EXTRA_RECIPE_ID, -1L);
-        bindSession(viewModel.loadSession(activeRecipeId));
+        activePlanId = getIntent().getStringExtra(CookingPreparationActivity.EXTRA_PLAN_ID);
+        if (activePlanId != null && !activePlanId.trim().isEmpty() && activeRecipeId > 0L) {
+            bindSession(viewModel.startSession(activeRecipeId, activePlanId));
+        } else {
+            bindSession(viewModel.loadSession(activeRecipeId));
+        }
     }
 
     @Override
@@ -128,8 +135,10 @@ public class CookingModeActivity extends Activity {
                         AppDatabase.getInstance(this).recipeDao(),
                         new SeedDataProvider()),
                 new RecipeMapper());
+        AppDatabase database = AppDatabase.getInstance(this);
         return new CookingRepository(new CookingLocalDataSource(this), recipeRepository,
-                new ShoppingRepository(new ShoppingLocalDataSource(this)));
+                new ShoppingRepository(new ShoppingLocalDataSource(this)),
+                new CookingPreparationRepository(database));
     }
 
     private void bindViews() {

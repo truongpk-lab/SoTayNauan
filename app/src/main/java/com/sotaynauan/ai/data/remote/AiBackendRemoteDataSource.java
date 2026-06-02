@@ -38,8 +38,21 @@ public class AiBackendRemoteDataSource {
 
     public String generateRecipeAdvice(List<String> selectedIngredients,
                                        List<RecipeMatch> matches) throws IOException, JSONException {
+        return generateRecipeAdvice(selectedIngredients, matches, null);
+    }
+
+    public String generateRecipeAdvice(List<String> selectedIngredients,
+                                       List<RecipeMatch> matches,
+                                       List<JSONObject> pantryItems) throws IOException, JSONException {
         JSONObject body = new JSONObject()
                 .put("selectedIngredients", new JSONArray(selectedIngredients));
+        JSONArray pantryRows = new JSONArray();
+        if (pantryItems != null) {
+            for (JSONObject pantryItem : pantryItems) {
+                pantryRows.put(pantryItem);
+            }
+        }
+        body.put("pantryItems", pantryRows);
         JSONArray matchRows = new JSONArray();
         if (matches != null) {
             for (RecipeMatch match : matches) {

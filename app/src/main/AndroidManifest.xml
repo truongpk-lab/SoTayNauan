@@ -43,6 +43,9 @@
             android:name=".ui.shopping.ShoppingPlanActivity"
             android:exported="false" />
         <activity
+            android:name=".ui.cooking.CookingPreparationActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.cooking.CookingTimerDoneActivity"
             android:exported="false" />
         <activity
