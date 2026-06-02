@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 public class CookingLocalDataSource {
     private static final String PREFS_NAME = "cooking_session_state";
     private static final String KEY_RECIPE_ID = "recipe_id";
+    private static final String KEY_PLAN_ID = "plan_id";
     private static final String KEY_STEP_INDEX = "step_index";
     private static final String KEY_UPDATED_AT = "updated_at";
     private static final String KEY_COMPLETED = "completed";
@@ -29,8 +30,13 @@ public class CookingLocalDataSource {
     }
 
     public void startSession(long recipeId) {
+        startSession(recipeId, "");
+    }
+
+    public void startSession(long recipeId, String planId) {
         preferences.edit()
                 .putLong(KEY_RECIPE_ID, recipeId)
+                .putString(KEY_PLAN_ID, planId == null ? "" : planId)
                 .putInt(KEY_STEP_INDEX, 0)
                 .putLong(KEY_UPDATED_AT, System.currentTimeMillis())
                 .putBoolean(KEY_COMPLETED, false)
@@ -137,6 +143,10 @@ public class CookingLocalDataSource {
 
     public long getActiveRecipeId() {
         return preferences.getLong(KEY_RECIPE_ID, -1L);
+    }
+
+    public String getActivePlanId() {
+        return preferences.getString(KEY_PLAN_ID, "");
     }
 
     public int getCurrentStepIndex() {

@@ -7,6 +7,7 @@ import androidx.room.Query;
 import androidx.room.Update;
 
 import com.sotaynauan.ai.data.local.entity.RecipeEntity;
+import com.sotaynauan.ai.data.local.entity.RecipeIngredientEntity;
 
 import java.util.List;
 
@@ -50,4 +51,16 @@ public interface RecipeDao {
 
     @Query("SELECT * FROM recipes WHERE totalMinutes <= 30 ORDER BY RANDOM() LIMIT 1")
     RecipeEntity findRandomQuickSuggestion();
+
+    @Query("SELECT * FROM recipe_ingredients WHERE recipeId = :recipeId ORDER BY sortOrder ASC, id ASC")
+    List<RecipeIngredientEntity> getRecipeIngredients(long recipeId);
+
+    @Query("SELECT * FROM recipe_ingredients ORDER BY recipeId ASC, sortOrder ASC, id ASC")
+    List<RecipeIngredientEntity> getAllRecipeIngredients();
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void upsertRecipeIngredients(List<RecipeIngredientEntity> ingredients);
+
+    @Query("DELETE FROM recipe_ingredients WHERE recipeId = :recipeId")
+    void deleteRecipeIngredients(long recipeId);
 }

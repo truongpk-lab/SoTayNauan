@@ -10,6 +10,7 @@ import com.sotaynauan.ai.data.local.entity.ShoppingItemEntity;
 import com.sotaynauan.ai.data.model.ShoppingPlanState;
 import com.sotaynauan.ai.data.model.ShoppingItemStatus;
 import com.sotaynauan.ai.data.model.ShoppingPlanItem;
+import com.sotaynauan.ai.data.repository.CookingPreparationRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -45,12 +46,14 @@ public class ShoppingLocalDataSource {
     private static final String FIELD_SEPARATOR = "\t";
 
     private final SharedPreferences preferences;
+    private final AppDatabase database;
     private final ShoppingItemDao shoppingItemDao;
 
     public ShoppingLocalDataSource(Context context) {
         preferences = context.getApplicationContext()
                 .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        shoppingItemDao = AppDatabase.getInstance(context).shoppingItemDao();
+        database = AppDatabase.getInstance(context);
+        shoppingItemDao = database.shoppingItemDao();
     }
 
     public ShoppingPlanState getCurrentPlan() {
@@ -107,8 +110,9 @@ public class ShoppingLocalDataSource {
     public ShoppingPlanState saveItems(long recipeId, String recipeName, List<ShoppingPlanItem> items,
                                        String statusMessage, boolean committed) {
         long now = System.currentTimeMillis();
+        List<ShoppingItemEntity> entities = toEntities(recipeId, recipeName, items, now, committed);
         shoppingItemDao.clearByCommitted(committed);
-        shoppingItemDao.upsertAll(toEntities(recipeId, recipeName, items, now, committed));
+        shoppingItemDao.upsertAll(entities);
         SharedPreferences.Editor editor = preferences.edit()
                 .putLong(keyRecipeId(committed), recipeId)
                 .putString(keyRecipeName(committed), recipeName)
@@ -143,6 +147,17 @@ public class ShoppingLocalDataSource {
             entity.status = item.getStatus().name();
             entity.committed = committed;
             entity.updatedAtMillis = updatedAtMillis;
+            ShoppingItemEntity source = findSourceEntity(item.getId(), committed);
+            entity.planId = source == null ? null : source.planId;
+            entity.ingredientId = source == null ? null : source.ingredientId;
+            entity.displayName = item.getName();
+            entity.requiredAmount = item.getAmount();
+            entity.boughtAmount = item.getStatus() == ShoppingItemStatus.BOUGHT
+                    ? item.getAmount()
+                    : source == null ? 0d : source.boughtAmount;
+            entity.baseUnit = item.getUnit();
+            entity.createdAt = source == null || source.createdAt <= 0L ? updatedAtMillis : source.createdAt;
+            entity.updatedAt = updatedAtMillis;
             entities.add(entity);
         }
         return entities;
@@ -154,6 +169,23 @@ public class ShoppingLocalDataSource {
 
     public ShoppingPlanState updateStatus(String itemId, ShoppingItemStatus status, boolean committed) {
         ShoppingPlanState state = committed ? getShoppingList() : getCurrentPlan();
+        ShoppingItemEntity sourceEntity = findSourceEntity(itemId, committed);
+        if (committed && status == ShoppingItemStatus.BOUGHT
+                && sourceEntity != null
+                && sourceEntity.planId != null
+                && sourceEntity.ingredientId != null) {
+            new CookingPreparationRepository(database).markBought(sourceEntity.planId,
+                    sourceEntity.ingredientId, sourceEntity.amount, sourceEntity.unit);
+        } else if (!committed
+                && sourceEntity != null
+                && sourceEntity.planId != null
+                && sourceEntity.ingredientId != null
+                && (status == ShoppingItemStatus.AT_HOME || status == ShoppingItemStatus.NEED_BUY)) {
+            new CookingPreparationRepository(database).markHaveAtHome(sourceEntity.planId,
+                    sourceEntity.ingredientId,
+                    status == ShoppingItemStatus.AT_HOME ? sourceEntity.amount : 0,
+                    sourceEntity.unit);
+        }
         List<ShoppingPlanItem> nextItems = new ArrayList<>();
         ShoppingPlanItem splitRemainder = null;
         for (ShoppingPlanItem item : state.getItems()) {
@@ -656,6 +688,23 @@ public class ShoppingLocalDataSource {
 
     private String entityId(String modelId, boolean committed) {
         return (committed ? "list|" : "plan|") + modelId;
+    }
+
+    private ShoppingItemEntity findSourceEntity(String modelId, boolean committed) {
+        ShoppingItemEntity entity = shoppingItemDao.findById(entityId(modelId, committed));
+        if (entity != null) {
+            return entity;
+        }
+        entity = shoppingItemDao.findById(modelId);
+        if (entity != null) {
+            return entity;
+        }
+        entity = shoppingItemDao.findById(entityId(modelId, !committed));
+        if (entity != null) {
+            return entity;
+        }
+        String alternatePrefix = committed ? "plan|" : "list|";
+        return shoppingItemDao.findById(alternatePrefix + modelId);
     }
 
     private String modelId(String entityId) {

@@ -175,6 +175,7 @@ async function callGeminiPayload(payload) {
 
 function buildRecipePrompt(body) {
   const ingredients = Array.isArray(body.selectedIngredients) ? body.selectedIngredients : [];
+  const pantry = Array.isArray(body.pantryItems) ? body.pantryItems : [];
   const matches = Array.isArray(body.matches) ? body.matches : [];
   const topMatches = matches.slice(0, 3).map(match => {
     const missing = Array.isArray(match.missingIngredients) && match.missingIngredients.length
@@ -186,9 +187,11 @@ function buildRecipePrompt(body) {
   return [
     "Bạn là AI Chef của app Sổ Tay Nấu Ăn AI.",
     "Trả lời tiếng Việt, 2-3 câu ngắn, thực tế cho gia đình.",
-    `Nguyên liệu người dùng có: ${ingredients.length ? ingredients.join(", ") : "chưa rõ"}.`,
+    "Không tự bịa số lượng. Chỉ dựa trên pantryItems và matches app gửi.",
+    `Nguyên liệu người dùng xác nhận: ${ingredients.length ? ingredients.join(", ") : "chưa rõ"}.`,
+    `Tồn bếp local: ${pantry.length ? JSON.stringify(pantry) : "chưa có dữ liệu tồn bếp"}.`,
     `Các món app đã so khớp local: ${topMatches || "chưa có món phù hợp"}.`,
-    "Hãy nêu món nên nấu trước, lý do ngắn, và một mẹo nhỏ."
+    "Hãy nêu món nên nấu trước, lý do ngắn, phần cần mua nếu matches có nêu, và một mẹo nhỏ."
   ].join(" ");
 }
 

@@ -229,6 +229,18 @@
                     android:textSize="16sp"
                     android:textStyle="bold" />
 
+                <Button
+                    android:id="@+id/recipeDetailPrepareButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_primary_button"
+                    android:text="Chuẩn bị nấu"
+                    android:textAllCaps="false"
+                    android:textColor="@color/on_primary"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

@@ -100,14 +100,16 @@ public class AiRecipeSuggestionActivity extends Activity {
     }
 
     private AiChefRepository createAiChefRepository() {
+        AppDatabase database = AppDatabase.getInstance(this);
         RecipeRepository recipeRepository = new RecipeRepository(
                 new RecipeLocalDataSource(
-                        AppDatabase.getInstance(this).recipeDao(),
+                        database.recipeDao(),
                         new SeedDataProvider()),
                 new RecipeMapper());
         return new AiChefRepository(new AiChefLocalDataSource(this),
                 recipeRepository,
-                new AiBackendRemoteDataSource(BuildConfig.AI_BACKEND_BASE_URL));
+                new AiBackendRemoteDataSource(BuildConfig.AI_BACKEND_BASE_URL),
+                database);
     }
 
     private void loadAiBackendSuggestions() {
