@@ -50,6 +50,7 @@ dependencies {
     implementation "androidx.camera:camera-lifecycle:${camerax_version}"
     implementation "androidx.camera:camera-view:${camerax_version}"
     implementation "androidx.room:room-runtime:2.6.1"
+    implementation "com.google.zxing:core:3.5.3"
     annotationProcessor "androidx.room:room-compiler:2.6.1"
     testImplementation "junit:junit:4.13.2"
     androidTestImplementation "junit:junit:4.13.2"

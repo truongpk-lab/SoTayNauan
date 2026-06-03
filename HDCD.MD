@@ -60,7 +60,14 @@ sdk.dir=C\:\\Users\\<TEN_USER>\\AppData\\Local\\Android\\Sdk
 Khong can tu dat `AI_BACKEND_BASE_URL` khi chay bang `run_app.bat`. Script se tu tao build debug dung:
 
 - `http://10.0.2.2:8787` khi chay emulator.
-- `http://127.0.0.1:8787` khi chay dien thoai that qua `adb reverse`.
+- IP LAN cua PC, vi du `http://192.168.1.25:8787`, khi chay dien thoai that. Cach nay giup cac dien thoai/tai khoan cung Wi-Fi dung chung cong dong bep nha.
+
+Neu may co nhieu card mang va script chon sai IP, chi dinh thu cong truoc khi chay:
+
+```bat
+set LAN_BACKEND_URL=http://192.168.1.25:8787
+.\run_app.bat
+```
 
 ## 5. Tao cau hinh backend
 
@@ -81,6 +88,8 @@ YOLO_MODEL_ID=original_yolov8s
 ```
 
 Neu chua co Gemini key, backend van chay va detector YOLO van hoat dong, nhung cac API goi Gemini se bao thieu key.
+
+Cong dong bep nha LAN cung chay tren backend Node port `8787`. Backend se tu tao `backend\data\community.json` de luu loi moi ket ban QR, ban be, chia se cong thuc, like, luu mon va binh luan. File nay la du lieu runtime local cua may chay backend, khong commit len git.
 
 ## 6. Cai va chay bang 3 terminal
 
@@ -151,6 +160,7 @@ cmd.exe /c gradlew.bat assembleDebug
 [ ] Terminal 1 YOLO detector dang chay port 8790.
 [ ] Terminal 2 AI backend dang chay port 8787 va /health bao yoloReady=true.
 [ ] Terminal 3 .\run_app.bat build, cai va mo app thanh cong.
+[ ] Neu dung dien thoai that cho cong dong LAN, dien thoai va PC o cung Wi-Fi, Windows Firewall cho phep port 8787.
 [ ] Vao mot cong thuc, bam chuan bi/bat dau nau de Room seed nhom nguyen lieu va gia vi.
 ```
 

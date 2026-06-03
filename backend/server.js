@@ -25,6 +25,8 @@ const RECIPE_IMAGE_SOURCE_SITES = (process.env.RECIPE_IMAGE_SOURCE_SITES || [
   "thatlangon.com",
   "afamily.vn"
 ].join(",")).split(",").map(value => value.trim()).filter(Boolean);
+const COMMUNITY_DATA_FILE = process.env.COMMUNITY_DATA_FILE
+  || path.join(__dirname, "data", "community.json");
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -46,6 +48,11 @@ const server = http.createServer(async (req, res) => {
           sourceSites: RECIPE_IMAGE_SOURCE_SITES
         }
       });
+      return;
+    }
+
+    if (req.url.startsWith("/api/community/")) {
+      await handleCommunityRequest(req, res);
       return;
     }
 
@@ -189,6 +196,390 @@ function readJson(req) {
     });
     req.on("error", reject);
   });
+}
+
+async function handleCommunityRequest(req, res) {
+  const parsedUrl = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+
+  if (req.method === "GET" && parsedUrl.pathname === "/api/community/state") {
+    const user = userFromQuery(parsedUrl.searchParams);
+    const query = String(parsedUrl.searchParams.get("query") || "").trim();
+    const state = loadCommunityData();
+    ensureCommunityUser(state, user);
+    saveCommunityData(state);
+    sendJson(res, 200, buildCommunityState(state, user.id, query));
+    return;
+  }
+
+  if (req.method !== "POST") {
+    sendJson(res, 405, { error: "Method not allowed" });
+    return;
+  }
+
+  const body = await readJson(req);
+  const state = loadCommunityData();
+  const actor = userFromBody(body);
+  ensureCommunityUser(state, actor);
+
+  if (parsedUrl.pathname === "/api/community/register") {
+    saveCommunityData(state);
+    sendJson(res, 200, buildCommunityState(state, actor.id, ""));
+    return;
+  }
+
+  if (parsedUrl.pathname === "/api/community/invites/send") {
+    const target = normalizeCommunityUser({
+      id: body.targetUserId,
+      name: body.targetName,
+      email: body.targetEmail
+    });
+    if (!target.id || target.id === actor.id) {
+      sendJson(res, 400, { error: "Invalid invite target" });
+      return;
+    }
+    ensureCommunityUser(state, target);
+    sendFriendRequest(state, actor.id, target.id);
+    saveCommunityData(state);
+    sendJson(res, 200, buildCommunityState(state, actor.id, ""));
+    return;
+  }
+
+  if (parsedUrl.pathname === "/api/community/invites/accept") {
+    const friendId = cleanText(body.friendId);
+    if (!friendId) {
+      sendJson(res, 400, { error: "Missing friendId" });
+      return;
+    }
+    acceptFriendRequest(state, actor.id, friendId);
+    saveCommunityData(state);
+    sendJson(res, 200, buildCommunityState(state, actor.id, ""));
+    return;
+  }
+
+  if (parsedUrl.pathname === "/api/community/shares") {
+    const friendId = cleanText(body.friendId);
+    if (!areFriends(state, actor.id, friendId)) {
+      sendJson(res, 403, { error: "Users are not friends" });
+      return;
+    }
+    const share = {
+      id: `share-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      fromUserId: actor.id,
+      toUserId: friendId,
+      recipeId: Number(body.recipeId || 0),
+      recipeName: cleanText(body.recipeName) || "Mâm cơm bếp nhà",
+      message: cleanText(body.message),
+      likedBy: [],
+      savedBy: [],
+      comments: [],
+      createdAtMillis: Date.now()
+    };
+    if (!share.message) {
+      share.message = `${actor.name} vừa chia sẻ công thức ${share.recipeName}.`;
+    }
+    state.shares.push(share);
+    saveCommunityData(state);
+    sendJson(res, 200, buildCommunityState(state, actor.id, ""));
+    return;
+  }
+
+  const shareAction = parsedUrl.pathname.match(/^\/api\/community\/shares\/([^/]+)\/(like|save|comment)$/);
+  if (shareAction) {
+    const share = state.shares.find(item => item.id === decodeURIComponent(shareAction[1]));
+    if (!share || !canSeeShare(share, actor.id)) {
+      sendJson(res, 404, { error: "Share not found" });
+      return;
+    }
+    const action = shareAction[2];
+    if (action === "like") {
+      toggleArrayValue(share.likedBy, actor.id);
+    } else if (action === "save") {
+      toggleArrayValue(share.savedBy, actor.id);
+    } else {
+      const comment = cleanText(body.comment);
+      if (!comment) {
+        sendJson(res, 400, { error: "Missing comment" });
+        return;
+      }
+      share.comments.push({
+        id: `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        shareId: share.id,
+        authorUserId: actor.id,
+        authorName: actor.name,
+        body: comment,
+        createdAtMillis: Date.now()
+      });
+    }
+    saveCommunityData(state);
+    sendJson(res, 200, buildCommunityState(state, actor.id, ""));
+    return;
+  }
+
+  sendJson(res, 404, { error: "Community endpoint not found" });
+}
+
+function loadCommunityData() {
+  const fallback = {
+    users: {},
+    friendRequests: [],
+    friendships: [],
+    shares: []
+  };
+  if (!fs.existsSync(COMMUNITY_DATA_FILE)) {
+    return fallback;
+  }
+  try {
+    const loaded = JSON.parse(fs.readFileSync(COMMUNITY_DATA_FILE, "utf8"));
+    return {
+      users: loaded.users && typeof loaded.users === "object" ? loaded.users : {},
+      friendRequests: Array.isArray(loaded.friendRequests) ? loaded.friendRequests : [],
+      friendships: Array.isArray(loaded.friendships) ? loaded.friendships : [],
+      shares: Array.isArray(loaded.shares) ? loaded.shares : []
+    };
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function saveCommunityData(state) {
+  fs.mkdirSync(path.dirname(COMMUNITY_DATA_FILE), { recursive: true });
+  fs.writeFileSync(COMMUNITY_DATA_FILE, JSON.stringify(state, null, 2), "utf8");
+}
+
+function userFromQuery(params) {
+  return normalizeCommunityUser({
+    id: params.get("userId"),
+    name: params.get("name"),
+    email: params.get("email")
+  });
+}
+
+function userFromBody(body) {
+  return normalizeCommunityUser({
+    id: body.userId,
+    name: body.name || body.displayName,
+    email: body.email
+  });
+}
+
+function normalizeCommunityUser(user) {
+  const id = cleanText(user?.id);
+  const email = cleanText(user?.email).toLowerCase();
+  const fallbackName = email ? email.split("@")[0] : "Bạn bếp nhà";
+  return {
+    id,
+    name: cleanText(user?.name) || fallbackName,
+    email
+  };
+}
+
+function ensureCommunityUser(state, user) {
+  if (!user.id) {
+    return;
+  }
+  const existing = state.users[user.id] || {};
+  state.users[user.id] = {
+    id: user.id,
+    name: user.name || existing.name || "Bạn bếp nhà",
+    email: user.email || existing.email || "",
+    updatedAtMillis: Date.now(),
+    createdAtMillis: existing.createdAtMillis || Date.now()
+  };
+}
+
+function sendFriendRequest(state, fromUserId, toUserId) {
+  if (areFriends(state, fromUserId, toUserId)) {
+    return;
+  }
+  const reverse = state.friendRequests.find(request =>
+    request.fromUserId === toUserId
+    && request.toUserId === fromUserId
+    && request.status === "pending");
+  if (reverse) {
+    reverse.status = "accepted";
+    reverse.updatedAtMillis = Date.now();
+    addFriendship(state, fromUserId, toUserId);
+    return;
+  }
+  const existing = state.friendRequests.find(request =>
+    request.fromUserId === fromUserId
+    && request.toUserId === toUserId
+    && request.status === "pending");
+  if (existing) {
+    existing.updatedAtMillis = Date.now();
+    return;
+  }
+  state.friendRequests.push({
+    id: `invite-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    fromUserId,
+    toUserId,
+    status: "pending",
+    createdAtMillis: Date.now(),
+    updatedAtMillis: Date.now()
+  });
+}
+
+function acceptFriendRequest(state, userId, friendId) {
+  const request = state.friendRequests.find(item =>
+    item.fromUserId === friendId
+    && item.toUserId === userId
+    && item.status === "pending");
+  if (request) {
+    request.status = "accepted";
+    request.updatedAtMillis = Date.now();
+  }
+  addFriendship(state, userId, friendId);
+}
+
+function addFriendship(state, firstUserId, secondUserId) {
+  const pair = friendshipPair(firstUserId, secondUserId);
+  if (!pair) {
+    return;
+  }
+  if (!state.friendships.some(item => item.key === pair.key)) {
+    state.friendships.push({
+      key: pair.key,
+      userIds: pair.userIds,
+      createdAtMillis: Date.now()
+    });
+  }
+}
+
+function friendshipPair(firstUserId, secondUserId) {
+  const userIds = [cleanText(firstUserId), cleanText(secondUserId)].filter(Boolean).sort();
+  if (userIds.length !== 2 || userIds[0] === userIds[1]) {
+    return null;
+  }
+  return {
+    key: userIds.join("::"),
+    userIds
+  };
+}
+
+function areFriends(state, firstUserId, secondUserId) {
+  const pair = friendshipPair(firstUserId, secondUserId);
+  return Boolean(pair && state.friendships.some(item => item.key === pair.key));
+}
+
+function buildCommunityState(state, userId, query) {
+  const normalizedQuery = cleanText(query).toLowerCase();
+  const friendIds = new Set();
+  for (const friendship of state.friendships) {
+    if (!Array.isArray(friendship.userIds) || !friendship.userIds.includes(userId)) {
+      continue;
+    }
+    friendship.userIds.forEach(id => {
+      if (id !== userId) {
+        friendIds.add(id);
+      }
+    });
+  }
+
+  const friends = Array.from(friendIds)
+    .map(id => friendDto(state, id, "friend", "Đã là thành viên bếp nhà của bạn."))
+    .filter(Boolean);
+  const invites = state.friendRequests
+    .filter(request => request.toUserId === userId && request.status === "pending")
+    .map(request => friendDto(state, request.fromUserId, "invite_received", "Đang chờ bạn xác nhận lời mời."))
+    .filter(Boolean);
+  const sentInvites = state.friendRequests
+    .filter(request => request.fromUserId === userId && request.status === "pending")
+    .map(request => friendDto(state, request.toUserId, "invite_sent", "Bạn đã gửi lời mời kết bạn."))
+    .filter(Boolean);
+  const blockedIds = new Set([userId, ...friendIds, ...invites.map(item => item.id), ...sentInvites.map(item => item.id)]);
+  const discoveries = Object.keys(state.users)
+    .filter(id => !blockedIds.has(id))
+    .map(id => friendDto(state, id, "discover", "Cùng dùng backend bếp nhà trong mạng LAN."))
+    .filter(Boolean);
+  const shares = state.shares
+    .filter(share => canSeeShare(share, userId))
+    .map(share => shareDto(state, share, userId))
+    .filter(Boolean)
+    .sort((a, b) => b.createdAtMillis - a.createdAtMillis);
+
+  return {
+    friends: filterCommunityRows(friends, normalizedQuery),
+    invites,
+    sentInvites,
+    discoveries: filterCommunityRows(discoveries, normalizedQuery),
+    shares: filterShareRows(shares, normalizedQuery),
+    statusMessage: "Cộng đồng LAN đã đồng bộ qua backend.",
+    serverTimeMillis: Date.now()
+  };
+}
+
+function friendDto(state, userId, status, note) {
+  const user = state.users[userId];
+  if (!user) {
+    return null;
+  }
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    note,
+    status,
+    sharedRecipeCount: state.shares.filter(share => share.fromUserId === user.id || share.toUserId === user.id).length
+  };
+}
+
+function shareDto(state, share, viewerUserId) {
+  const fromUser = state.users[share.fromUserId] || { name: "Bạn bếp nhà" };
+  const toUser = state.users[share.toUserId] || { name: "Bạn bếp nhà" };
+  const fromMe = share.fromUserId === viewerUserId;
+  return {
+    id: share.id,
+    friendId: fromMe ? share.toUserId : share.fromUserId,
+    friendName: fromMe ? `Bạn → ${toUser.name}` : fromUser.name,
+    recipeId: Number(share.recipeId || 0),
+    recipeName: share.recipeName || "Mâm cơm bếp nhà",
+    message: share.message || "",
+    likeCount: Array.isArray(share.likedBy) ? share.likedBy.length : 0,
+    commentCount: Array.isArray(share.comments) ? share.comments.length : 0,
+    liked: Array.isArray(share.likedBy) && share.likedBy.includes(viewerUserId),
+    saved: Array.isArray(share.savedBy) && share.savedBy.includes(viewerUserId),
+    fromMe,
+    createdAtMillis: Number(share.createdAtMillis || 0),
+    comments: Array.isArray(share.comments) ? share.comments.map(comment => ({
+      id: comment.id,
+      shareId: share.id,
+      authorName: comment.authorName || state.users[comment.authorUserId]?.name || "Bạn bếp nhà",
+      body: comment.body || "",
+      createdAtMillis: Number(comment.createdAtMillis || 0)
+    })) : []
+  };
+}
+
+function canSeeShare(share, userId) {
+  return share.fromUserId === userId || share.toUserId === userId;
+}
+
+function toggleArrayValue(values, value) {
+  if (!Array.isArray(values)) {
+    return;
+  }
+  const index = values.indexOf(value);
+  if (index >= 0) {
+    values.splice(index, 1);
+  } else {
+    values.push(value);
+  }
+}
+
+function filterCommunityRows(rows, query) {
+  if (!query) {
+    return rows;
+  }
+  return rows.filter(row => [row.name, row.email, row.note]
+    .some(value => String(value || "").toLowerCase().includes(query)));
+}
+
+function filterShareRows(rows, query) {
+  if (!query) {
+    return rows;
+  }
+  return rows.filter(row => [row.friendName, row.recipeName, row.message]
+    .some(value => String(value || "").toLowerCase().includes(query)));
 }
 
 async function callGemini(prompt) {

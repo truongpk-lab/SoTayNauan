@@ -39,6 +39,13 @@ public class CommunityViewModel {
         return state;
     }
 
+    public CommunityState inviteByQr(String payload) {
+        query = "";
+        CommunityState state = repository.inviteByQrPayload(payload);
+        status = state.getStatusMessage();
+        return state;
+    }
+
     public CommunityState shareRecipe(String friendId) {
         return shareRecipe(friendId, null);
     }

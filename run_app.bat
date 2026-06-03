@@ -80,8 +80,10 @@ if "%TARGET_KIND%"=="emulator" (
     echo Dang dung emulator: %TARGET_DEVICE%
     echo Neu muon camera that tren emulator, hay cau hinh AVD Camera = Webcam0.
 ) else (
-    set "DEBUG_BACKEND_URL=http://127.0.0.1:8787"
+    call :detect_lan_backend_url
+    if not defined DEBUG_BACKEND_URL set "DEBUG_BACKEND_URL=http://127.0.0.1:8787"
     echo Dang dung thiet bi Android that: %TARGET_DEVICE%
+    echo Backend LAN cho app: %DEBUG_BACKEND_URL%
 )
 
 echo [3/8] Cho Android framework va package manager san sang...
@@ -89,12 +91,7 @@ call :wait_android_ready
 if errorlevel 1 exit /b 1
 
 if "%TARGET_KIND%"=="real" (
-    echo [4/8] Mo adb reverse de dien thoai goi backend qua USB...
-    "%ADB%" -s "%TARGET_DEVICE%" reverse tcp:8787 tcp:8787
-    if errorlevel 1 (
-        echo Khong tao duoc adb reverse tcp:8787. Hay kiem tra USB debugging/RSA prompt.
-        exit /b 1
-    )
+    echo [4/8] Dien thoai that se goi backend qua IP LAN. Hay dam bao cung Wi-Fi va firewall cho phep port 8787.
 ) else (
     echo [4/8] Emulator se goi backend may host qua 10.0.2.2.
 )
@@ -147,6 +144,16 @@ for /f "skip=1 tokens=1,2" %%a in ('"%ADB%" devices') do (
             )
         )
     )
+)
+exit /b 0
+
+:detect_lan_backend_url
+if defined LAN_BACKEND_URL (
+    set "DEBUG_BACKEND_URL=%LAN_BACKEND_URL%"
+    exit /b 0
+)
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "$ip = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and $_.InterfaceOperationalStatus -eq 'Up' } | Select-Object -First 1 -ExpandProperty IPAddress; if ($ip) { 'http://' + $ip + ':8787' }"`) do (
+    set "DEBUG_BACKEND_URL=%%i"
 )
 exit /b 0
 

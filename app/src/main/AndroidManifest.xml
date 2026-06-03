@@ -33,6 +33,9 @@
             android:name=".ui.community.CommunityActivity"
             android:exported="false" />
         <activity
+            android:name=".ui.community.QrInviteScannerActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.search.SearchActivity"
             android:exported="false" />
         <activity

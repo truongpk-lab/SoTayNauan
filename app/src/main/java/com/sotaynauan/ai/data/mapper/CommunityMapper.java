@@ -1,7 +1,9 @@
 package com.sotaynauan.ai.data.mapper;
 
+import com.sotaynauan.ai.data.local.entity.CommunityCommentEntity;
 import com.sotaynauan.ai.data.local.entity.CommunityFriendEntity;
 import com.sotaynauan.ai.data.local.entity.CommunityShareEntity;
+import com.sotaynauan.ai.data.model.CommunityComment;
 import com.sotaynauan.ai.data.model.CommunityFriend;
 import com.sotaynauan.ai.data.model.CommunityShare;
 
@@ -23,9 +25,13 @@ public class CommunityMapper {
     }
 
     public CommunityShare toShare(CommunityShareEntity entity) {
+        return toShare(entity, new ArrayList<>());
+    }
+
+    public CommunityShare toShare(CommunityShareEntity entity, List<CommunityComment> comments) {
         return new CommunityShare(entity.id, entity.friendId, entity.friendName, entity.recipeId,
                 entity.recipeName, entity.message, entity.likeCount, entity.commentCount,
-                entity.liked, entity.saved, entity.fromMe);
+                entity.liked, entity.saved, entity.fromMe, comments);
     }
 
     public List<CommunityShare> toShares(List<CommunityShareEntity> entities) {
@@ -34,5 +40,18 @@ public class CommunityMapper {
             shares.add(toShare(entity));
         }
         return shares;
+    }
+
+    public CommunityComment toComment(CommunityCommentEntity entity) {
+        return new CommunityComment(entity.id, entity.shareId, entity.authorName, entity.body,
+                entity.createdAtMillis);
+    }
+
+    public List<CommunityComment> toComments(List<CommunityCommentEntity> entities) {
+        List<CommunityComment> comments = new ArrayList<>();
+        for (CommunityCommentEntity entity : entities) {
+            comments.add(toComment(entity));
+        }
+        return comments;
     }
 }

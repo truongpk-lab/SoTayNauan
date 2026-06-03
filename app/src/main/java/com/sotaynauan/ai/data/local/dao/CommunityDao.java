@@ -7,6 +7,7 @@ import androidx.room.Query;
 import androidx.room.Update;
 
 import com.sotaynauan.ai.data.local.entity.CommunityFriendEntity;
+import com.sotaynauan.ai.data.local.entity.CommunityCommentEntity;
 import com.sotaynauan.ai.data.local.entity.CommunityShareEntity;
 
 import java.util.List;
@@ -31,6 +32,9 @@ public interface CommunityDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insertShare(CommunityShareEntity share);
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    void insertComment(CommunityCommentEntity comment);
+
     @Update
     void updateFriend(CommunityFriendEntity friend);
 
@@ -43,6 +47,9 @@ public interface CommunityDao {
     @Query("SELECT * FROM community_friends WHERE id = :friendId LIMIT 1")
     CommunityFriendEntity findFriend(String friendId);
 
+    @Query("SELECT * FROM community_friends WHERE email = :email LIMIT 1")
+    CommunityFriendEntity findFriendByEmail(String email);
+
     @Query("SELECT * FROM community_friends WHERE status = 'friend' AND (name LIKE '%' || :query || '%' OR email LIKE '%' || :query || '%') ORDER BY sharedRecipeCount DESC, name ASC")
     List<CommunityFriendEntity> searchFriends(String query);
 
@@ -54,4 +61,7 @@ public interface CommunityDao {
 
     @Query("SELECT * FROM community_shares WHERE id = :shareId LIMIT 1")
     CommunityShareEntity findShare(String shareId);
+
+    @Query("SELECT * FROM community_comments WHERE shareId = :shareId ORDER BY createdAtMillis ASC")
+    List<CommunityCommentEntity> getCommentsForShare(String shareId);
 }

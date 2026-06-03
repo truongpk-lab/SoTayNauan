@@ -2,7 +2,9 @@ package com.sotaynauan.ai.data.model;
 
 public class CommunityFriend {
     public static final String STATUS_FRIEND = "friend";
-    public static final String STATUS_INVITED = "invited";
+    public static final String STATUS_INVITE_SENT = "invite_sent";
+    public static final String STATUS_INVITE_RECEIVED = "invite_received";
+    public static final String STATUS_INVITED = STATUS_INVITE_RECEIVED;
     public static final String STATUS_DISCOVER = "discover";
 
     private final String id;

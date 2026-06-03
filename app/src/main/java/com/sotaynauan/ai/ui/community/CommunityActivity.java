@@ -2,7 +2,11 @@ package com.sotaynauan.ai.ui.community;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.Editable;
@@ -16,19 +20,30 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.WriterException;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
+import com.sotaynauan.ai.BuildConfig;
 import com.sotaynauan.ai.R;
 import com.sotaynauan.ai.adapter.community.CommunityAdapter;
+import com.sotaynauan.ai.data.local.datasource.AuthLocalDataSource;
 import com.sotaynauan.ai.data.local.database.AppDatabase;
 import com.sotaynauan.ai.data.local.datasource.CommunityLocalDataSource;
 import com.sotaynauan.ai.data.local.datasource.RecipeLocalDataSource;
+import com.sotaynauan.ai.data.local.datasource.SessionLocalDataSource;
 import com.sotaynauan.ai.data.mapper.CommunityMapper;
 import com.sotaynauan.ai.data.mapper.RecipeMapper;
+import com.sotaynauan.ai.data.model.AppSession;
+import com.sotaynauan.ai.data.model.AuthUser;
 import com.sotaynauan.ai.data.model.CommunityFriend;
 import com.sotaynauan.ai.data.model.CommunityShare;
 import com.sotaynauan.ai.data.model.CommunityState;
 import com.sotaynauan.ai.data.model.Recipe;
+import com.sotaynauan.ai.data.remote.CommunityRemoteDataSource;
 import com.sotaynauan.ai.data.repository.CommunityRepository;
 import com.sotaynauan.ai.data.repository.RecipeRepository;
+import com.sotaynauan.ai.data.repository.SessionRepository;
 import com.sotaynauan.ai.data.seed.SeedDataProvider;
 import com.sotaynauan.ai.ui.ai.AiChefActivity;
 import com.sotaynauan.ai.ui.home.HomeActivity;
@@ -51,6 +66,7 @@ public class CommunityActivity extends Activity {
     private static final String TAB_FRIENDS = "friends";
     private static final String TAB_INVITES = "invites";
     private static final String TAB_DISCOVER = "discover";
+    private static final int REQUEST_SCAN_QR = 441;
 
     private CommunityViewModel viewModel;
     private CommunityRepository communityRepository;
@@ -75,11 +91,21 @@ public class CommunityActivity extends Activity {
 
         pendingFriendId = getIntent().getStringExtra(EXTRA_FRIEND_ID);
         recipeRepository = createRecipeRepository();
+        AppSession session = new SessionRepository(new SessionLocalDataSource(this)).getSession();
+        AuthUser authUser = new AuthLocalDataSource(this).findUserById(session.getUserId());
+        String currentEmail = authUser == null ? session.getUserId() + "@local" : authUser.getEmail();
         communityRepository = new CommunityRepository(
                 new CommunityLocalDataSource(
                         AppDatabase.getInstance(this).communityDao(),
                         new SeedDataProvider()),
-                new CommunityMapper());
+                new CommunityMapper(),
+                session.getUserId(),
+                session.getDisplayName(),
+                currentEmail,
+                new CommunityRemoteDataSource(BuildConfig.AI_BACKEND_BASE_URL,
+                        session.getUserId(),
+                        session.getDisplayName(),
+                        currentEmail));
         viewModel = new CommunityViewModel(communityRepository);
         adapter = new CommunityAdapter(this, new CommunityAdapter.Listener() {
             @Override
@@ -203,8 +229,8 @@ public class CommunityActivity extends Activity {
         statusText.setText(state.getStatusMessage());
         bindTabs(state);
         if (TAB_INVITES.equals(activeTab)) {
-            adapter.bindInvites(friendListContainer, state.getInvites());
-            emptyText.setVisibility(state.getInvites().isEmpty() ? View.VISIBLE : View.GONE);
+            bindInviteTab(state);
+            emptyText.setVisibility(View.GONE);
         } else if (TAB_DISCOVER.equals(activeTab)) {
             adapter.bindDiscoveries(friendListContainer, state.getDiscoveries());
             emptyText.setVisibility(state.getDiscoveries().isEmpty() ? View.VISIBLE : View.GONE);
@@ -216,9 +242,19 @@ public class CommunityActivity extends Activity {
         openPendingFriendProfile();
     }
 
+    private void bindInviteTab(CommunityState state) {
+        friendListContainer.removeAllViews();
+        friendListContainer.addView(createInviteToolsView(state));
+        adapter.appendInviteSection(friendListContainer, "Đã nhận", state.getInvites(),
+                "Nhận lời", true);
+        adapter.appendInviteSection(friendListContainer, "Đã gửi", state.getSentInvites(),
+                "Đã gửi", false);
+    }
+
     private void bindTabs(CommunityState state) {
         bindTab(friendsTab, TAB_FRIENDS, "Bạn bè");
-        bindTab(invitesTab, TAB_INVITES, "Lời mời " + state.getInvites().size());
+        bindTab(invitesTab, TAB_INVITES, "Lời mời "
+                + (state.getInvites().size() + state.getSentInvites().size()));
         bindTab(discoverTab, TAB_DISCOVER, "Khám phá");
     }
 
@@ -227,6 +263,128 @@ public class CommunityActivity extends Activity {
         tab.setText(label);
         tab.setTextColor(active ? Color.parseColor("#944A00") : Color.parseColor("#564337"));
         tab.setBackgroundResource(active ? R.drawable.bg_community_tab_active : 0);
+    }
+
+    private View createInviteToolsView(CommunityState state) {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(16), dp(16), dp(16), dp(16));
+        panel.setBackgroundResource(R.drawable.bg_voice_settings_card);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, 0, 0, dp(12));
+        panel.setLayoutParams(params);
+
+        TextView title = createDialogText("Mã QR kết bạn của bạn", 18, "#2F170F");
+        title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
+        panel.addView(title);
+
+        TextView subtitle = createDialogText(
+                "Đưa mã này cho tài khoản khác quét, hoặc quét mã của họ để gửi lời mời.",
+                14,
+                "#564337");
+        subtitle.setPadding(0, dp(6), 0, dp(12));
+        panel.addView(subtitle);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        panel.addView(actions);
+
+        TextView showQrButton = createInviteToolButton("Xem mã QR");
+        showQrButton.setOnClickListener(view -> showMyQrDialog(state.getCurrentUserQrPayload()));
+        actions.addView(showQrButton, new LinearLayout.LayoutParams(
+                0,
+                dp(48),
+                1f));
+
+        TextView scanQrButton = createInviteToolButton("Quét mã");
+        scanQrButton.setOnClickListener(view -> openQrScanner());
+        LinearLayout.LayoutParams scanParams = new LinearLayout.LayoutParams(
+                0,
+                dp(48),
+                1f);
+        scanParams.setMargins(dp(10), 0, 0, 0);
+        actions.addView(scanQrButton, scanParams);
+        return panel;
+    }
+
+    private TextView createInviteToolButton(String text) {
+        TextView button = new TextView(this);
+        button.setText(text);
+        button.setGravity(Gravity.CENTER);
+        button.setTextSize(14);
+        button.setTypeface(button.getTypeface(), android.graphics.Typeface.BOLD);
+        button.setTextColor(Color.WHITE);
+        button.setBackgroundResource(R.drawable.bg_community_primary);
+        button.setClickable(true);
+        return button;
+    }
+
+    private void showMyQrDialog(String payload) {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(20), dp(12), dp(20), dp(8));
+        content.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        ImageView imageView = new ImageView(this);
+        Bitmap bitmap = createQrBitmap(payload, dp(220));
+        if (bitmap != null) {
+            imageView.setImageBitmap(bitmap);
+        }
+        content.addView(imageView, new LinearLayout.LayoutParams(dp(220), dp(220)));
+
+        TextView code = createDialogText(payload, 12, "#564337");
+        code.setPadding(0, dp(12), 0, 0);
+        content.addView(code);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Mã QR kết bạn")
+                .setView(content)
+                .setNegativeButton("Đóng", null)
+                .setPositiveButton("Sao chép mã", (dialog, which) -> copyInvitePayload(payload))
+                .show();
+    }
+
+    private Bitmap createQrBitmap(String payload, int sizePx) {
+        try {
+            BitMatrix matrix = new QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE,
+                    sizePx, sizePx);
+            Bitmap bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+            for (int y = 0; y < sizePx; y++) {
+                for (int x = 0; x < sizePx; x++) {
+                    bitmap.setPixel(x, y, matrix.get(x, y) ? Color.BLACK : Color.WHITE);
+                }
+            }
+            return bitmap;
+        } catch (WriterException exception) {
+            statusText.setText("Chưa tạo được mã QR.");
+            return null;
+        }
+    }
+
+    private void copyInvitePayload(String payload) {
+        ClipboardManager clipboard =
+                (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard != null) {
+            clipboard.setPrimaryClip(ClipData.newPlainText("Mã lời mời bếp nhà", payload));
+            statusText.setText("Đã sao chép mã lời mời.");
+        }
+    }
+
+    private void openQrScanner() {
+        startActivityForResult(new Intent(this, QrInviteScannerActivity.class), REQUEST_SCAN_QR);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_SCAN_QR || resultCode != RESULT_OK || data == null) {
+            return;
+        }
+        String payload = data.getStringExtra(QrInviteScannerActivity.EXTRA_QR_PAYLOAD);
+        activeTab = TAB_INVITES;
+        bindState(viewModel.inviteByQr(payload));
     }
 
     private void showFriendProfile(CommunityFriend friend) {

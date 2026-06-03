@@ -65,7 +65,7 @@ Terminal 3 - build, cai va mo app Android:
     cd D:\SoTayNauAn
     .\run_app.bat
 
-`run_app.bat` se kiem tra backend va YOLO qua `/health`, uu tien dien thoai that neu co, tu mo emulator neu can, build debug APK, cai APK va mo app.
+`run_app.bat` se kiem tra backend va YOLO qua `/health`, uu tien dien thoai that neu co, tu mo emulator neu can, build debug APK, cai APK va mo app. Khi cai tren dien thoai that, script se build app voi IP LAN cua may PC chay backend de cac dien thoai/tai khoan cung Wi-Fi co the dung chung cong dong bep nha.
 
 ## Endpoint local
 
@@ -74,11 +74,14 @@ YOLO detector: http://127.0.0.1:8790
 AI backend:    http://127.0.0.1:8787
 ```
 
-Khi chay emulator, app debug goi backend host qua `http://10.0.2.2:8787`. Khi chay dien thoai that, `run_app.bat` tu tao:
+Khi chay emulator, app debug goi backend host qua `http://10.0.2.2:8787`. Khi chay dien thoai that, `run_app.bat` tu lay IP LAN cua PC, vi du `http://192.168.1.25:8787`, de cac may trong cung Wi-Fi ket noi chung backend. Neu muon chi dinh IP thu cong:
 
-```text
-adb reverse tcp:8787 tcp:8787
+```bat
+set LAN_BACKEND_URL=http://192.168.1.25:8787
+.\run_app.bat
 ```
+
+Cong dong bep nha LAN dung chung backend Node de dong bo loi moi ket ban QR, danh sach ban be, chia se cong thuc, like, luu mon va binh luan. Du lieu cong dong duoc luu o `backend\data\community.json`.
 
 ## Build APK debug rieng
 

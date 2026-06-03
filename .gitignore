@@ -15,6 +15,7 @@ build/
 app/build/
 backend/node_modules/
 backend/.env
+backend/data/*.json
 backend/yolo_detector/.venv/
 backend/yolo_detector/models/*/model.pt
 !backend/yolo_detector/models/original_yolov8s/model.pt

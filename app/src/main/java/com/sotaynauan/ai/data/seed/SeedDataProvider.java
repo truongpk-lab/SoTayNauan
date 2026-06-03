@@ -1001,7 +1001,9 @@ public class SeedDataProvider {
         friends.add(friend("chu-hai", "Chú Hải", "hai.giadinh@example.com",
                 "Giữ nhiều mẹo món kho truyền thống.", CommunityFriend.STATUS_FRIEND, 24, now - 86400000L * 30));
         friends.add(friend("me-an", "Mẹ An", "me.an@example.com",
-                "Đang chờ bạn xác nhận lời mời.", CommunityFriend.STATUS_INVITED, 18, now - 86400000L * 2));
+                "Đang chờ bạn xác nhận lời mời.", CommunityFriend.STATUS_INVITE_RECEIVED, 18, now - 86400000L * 2));
+        friends.add(friend("anh-khoa", "Anh Khoa", "khoa.bepnha@example.com",
+                "Bạn đã gửi lời mời kết bạn qua mã QR.", CommunityFriend.STATUS_INVITE_SENT, 3, now - 3600000L * 9));
         friends.add(friend("bep-nha-linh", "Bếp nhà Linh", "linh.kitchen@example.com",
                 "Gợi ý kết bạn từ công thức món lành mạnh.", CommunityFriend.STATUS_DISCOVER, 15, now - 86400000L));
         return friends;

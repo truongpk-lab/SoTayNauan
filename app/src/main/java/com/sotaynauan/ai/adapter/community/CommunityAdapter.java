@@ -11,6 +11,7 @@ import android.widget.TextView;
 
 import com.sotaynauan.ai.data.model.CommunityFriend;
 import com.sotaynauan.ai.data.model.CommunityShare;
+import com.sotaynauan.ai.data.model.CommunityComment;
 
 import java.util.List;
 
@@ -43,8 +44,37 @@ public class CommunityAdapter {
 
     public void bindInvites(LinearLayout container, List<CommunityFriend> invites) {
         container.removeAllViews();
+        appendInviteSection(container, "Đã nhận", invites, "Nhận lời", true);
+    }
+
+    public void appendInviteSection(LinearLayout container, String title, List<CommunityFriend> invites,
+                                    String action, boolean canAccept) {
+        TextView titleView = title(title, 17);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        titleParams.setMargins(0, dp(12), 0, dp(8));
+        titleView.setLayoutParams(titleParams);
+        container.addView(titleView);
+
+        if (invites.isEmpty()) {
+            TextView empty = body(canAccept
+                            ? "Chưa có lời mời mới."
+                            : "Chưa gửi lời mời nào.",
+                    14,
+                    Color.parseColor("#7A6558"));
+            empty.setPadding(dp(4), 0, 0, dp(8));
+            container.addView(empty);
+            return;
+        }
+
         for (CommunityFriend friend : invites) {
-            container.addView(createFriendCard(friend, "Nhận lời", view -> listener.onAcceptInvite(friend)));
+            container.addView(createFriendCard(friend, action, view -> {
+                if (canAccept) {
+                    listener.onAcceptInvite(friend);
+                } else {
+                    listener.onFriendProfile(friend);
+                }
+            }));
         }
     }
 
@@ -146,7 +176,36 @@ public class CommunityAdapter {
                 false, view -> listener.onCommentShare(share)));
         actions.addView(actionChip(share.isSaved() ? "Đã lưu" : "Lưu món",
                 share.isSaved(), view -> listener.onSaveShare(share)));
+        addComments(card, share.getComments());
         return card;
+    }
+
+    private void addComments(LinearLayout card, List<CommunityComment> comments) {
+        if (comments.isEmpty()) {
+            return;
+        }
+
+        LinearLayout commentBox = new LinearLayout(context);
+        commentBox.setOrientation(LinearLayout.VERTICAL);
+        commentBox.setPadding(dp(12), dp(10), dp(12), dp(8));
+        commentBox.setBackground(round(Color.parseColor("#FFF8F6"), dp(14), Color.parseColor("#E7CFC3")));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, dp(10), 0, 0);
+        card.addView(commentBox, params);
+
+        int start = Math.max(0, comments.size() - 2);
+        for (int index = start; index < comments.size(); index++) {
+            CommunityComment comment = comments.get(index);
+            TextView text = body(comment.getAuthorName() + ": " + comment.getBody(),
+                    13,
+                    Color.parseColor("#2E150B"));
+            if (index > start) {
+                text.setPadding(0, dp(6), 0, 0);
+            }
+            commentBox.addView(text);
+        }
     }
 
     private TextView avatar(String name) {

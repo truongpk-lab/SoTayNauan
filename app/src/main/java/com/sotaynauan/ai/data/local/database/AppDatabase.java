@@ -14,6 +14,7 @@ import com.sotaynauan.ai.data.local.dao.PantryDao;
 import com.sotaynauan.ai.data.local.dao.RecipeDao;
 import com.sotaynauan.ai.data.local.dao.ShoppingItemDao;
 import com.sotaynauan.ai.data.local.dao.CommunityDao;
+import com.sotaynauan.ai.data.local.entity.CommunityCommentEntity;
 import com.sotaynauan.ai.data.local.entity.CommunityFriendEntity;
 import com.sotaynauan.ai.data.local.entity.CommunityShareEntity;
 import com.sotaynauan.ai.data.local.entity.CookingPlanEntity;
@@ -38,9 +39,10 @@ import com.sotaynauan.ai.data.local.entity.ShoppingItemEntity;
         ShoppingItemEntity.class,
         InventoryTransactionEntity.class,
         CommunityFriendEntity.class,
+        CommunityCommentEntity.class,
         CommunityShareEntity.class,
         SharedCookingPlanEntity.class
-}, version = 6, exportSchema = false)
+}, version = 7, exportSchema = false)
 public abstract class AppDatabase extends RoomDatabase {
     private static volatile AppDatabase instance;
 
@@ -104,6 +106,17 @@ public abstract class AppDatabase extends RoomDatabase {
         }
     };
 
+    private static final Migration MIGRATION_6_7 = new Migration(6, 7) {
+        @Override
+        public void migrate(SupportSQLiteDatabase database) {
+            database.execSQL("CREATE TABLE IF NOT EXISTS `community_comments` (`id` TEXT NOT NULL, `shareId` TEXT, `authorName` TEXT, `body` TEXT, `createdAtMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_community_comments_shareId` ON `community_comments` (`shareId`)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_community_comments_createdAtMillis` ON `community_comments` (`createdAtMillis`)");
+            database.execSQL("UPDATE `community_friends` SET `status` = 'invite_sent' WHERE `status` = 'invited' AND `note` LIKE '%Đã gửi%'");
+            database.execSQL("UPDATE `community_friends` SET `status` = 'invite_received' WHERE `status` = 'invited'");
+        }
+    };
+
     public static AppDatabase getInstance(Context context) {
         if (instance == null) {
             synchronized (AppDatabase.class) {
@@ -113,7 +126,7 @@ public abstract class AppDatabase extends RoomDatabase {
                             AppDatabase.class,
                             "so_tay_nau_an.db")
                             .allowMainThreadQueries()
-                            .addMigrations(MIGRATION_5_6)
+                            .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
                             .build();
                 }
             }

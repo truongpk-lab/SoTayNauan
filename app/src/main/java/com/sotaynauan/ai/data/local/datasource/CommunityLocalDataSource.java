@@ -1,6 +1,7 @@
 package com.sotaynauan.ai.data.local.datasource;
 
 import com.sotaynauan.ai.data.local.dao.CommunityDao;
+import com.sotaynauan.ai.data.local.entity.CommunityCommentEntity;
 import com.sotaynauan.ai.data.local.entity.CommunityFriendEntity;
 import com.sotaynauan.ai.data.local.entity.CommunityShareEntity;
 import com.sotaynauan.ai.data.model.CommunityFriend;
@@ -33,7 +34,12 @@ public class CommunityLocalDataSource {
 
     public List<CommunityFriendEntity> getInvites() {
         seedIfNeeded();
-        return communityDao.getFriendsByStatus(CommunityFriend.STATUS_INVITED);
+        return communityDao.getFriendsByStatus(CommunityFriend.STATUS_INVITE_RECEIVED);
+    }
+
+    public List<CommunityFriendEntity> getSentInvites() {
+        seedIfNeeded();
+        return communityDao.getFriendsByStatus(CommunityFriend.STATUS_INVITE_SENT);
     }
 
     public List<CommunityFriendEntity> getDiscoveries() {
@@ -61,6 +67,11 @@ public class CommunityLocalDataSource {
         return communityDao.findFriend(friendId);
     }
 
+    public CommunityFriendEntity findFriendByEmail(String email) {
+        seedIfNeeded();
+        return communityDao.findFriendByEmail(email);
+    }
+
     public CommunityShareEntity findShare(String shareId) {
         seedIfNeeded();
         return communityDao.findShare(shareId);
@@ -74,7 +85,20 @@ public class CommunityLocalDataSource {
         communityDao.updateShare(share);
     }
 
+    public void insertFriend(CommunityFriendEntity friend) {
+        communityDao.insertFriend(friend);
+    }
+
     public void insertShare(CommunityShareEntity share) {
         communityDao.insertShare(share);
+    }
+
+    public void insertComment(CommunityCommentEntity comment) {
+        communityDao.insertComment(comment);
+    }
+
+    public List<CommunityCommentEntity> getCommentsForShare(String shareId) {
+        seedIfNeeded();
+        return communityDao.getCommentsForShare(shareId);
     }
 }

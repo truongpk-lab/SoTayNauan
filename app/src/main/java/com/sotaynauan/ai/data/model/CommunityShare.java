@@ -1,5 +1,9 @@
 package com.sotaynauan.ai.data.model;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 public class CommunityShare {
     private final String id;
     private final String friendId;
@@ -12,10 +16,19 @@ public class CommunityShare {
     private final boolean liked;
     private final boolean saved;
     private final boolean fromMe;
+    private final List<CommunityComment> comments;
 
     public CommunityShare(String id, String friendId, String friendName, long recipeId,
                           String recipeName, String message, int likeCount, int commentCount,
                           boolean liked, boolean saved, boolean fromMe) {
+        this(id, friendId, friendName, recipeId, recipeName, message, likeCount, commentCount,
+                liked, saved, fromMe, new ArrayList<>());
+    }
+
+    public CommunityShare(String id, String friendId, String friendName, long recipeId,
+                          String recipeName, String message, int likeCount, int commentCount,
+                          boolean liked, boolean saved, boolean fromMe,
+                          List<CommunityComment> comments) {
         this.id = id;
         this.friendId = friendId;
         this.friendName = friendName;
@@ -27,6 +40,7 @@ public class CommunityShare {
         this.liked = liked;
         this.saved = saved;
         this.fromMe = fromMe;
+        this.comments = new ArrayList<>(comments);
     }
 
     public String getId() { return id; }
@@ -40,4 +54,5 @@ public class CommunityShare {
     public boolean isLiked() { return liked; }
     public boolean isSaved() { return saved; }
     public boolean isFromMe() { return fromMe; }
+    public List<CommunityComment> getComments() { return Collections.unmodifiableList(comments); }
 }
