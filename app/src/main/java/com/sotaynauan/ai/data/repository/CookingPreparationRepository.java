@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Locale;
 
 public class CookingPreparationRepository {
+    private static volatile boolean seedSynced;
+
     private final AppDatabase database;
     private final RecipeDao recipeDao;
     private final IngredientDao ingredientDao;
@@ -100,6 +102,13 @@ public class CookingPreparationRepository {
     public CookingPlanEntity preparePlanFromRecipe(long recipeId, int targetServings) {
         CookingPlanEntity plan = createPlanFromRecipe(recipeId, targetServings);
         applyCommittedShoppingProgress(plan.id);
+        return cookingPlanDao.getPlan(plan.id);
+    }
+
+    public CookingPlanEntity preparePlanFromRecipe(long recipeId, int targetServings,
+                                                   List<String> checkedIngredients) {
+        CookingPlanEntity plan = preparePlanFromRecipe(recipeId, targetServings);
+        applyCheckedIngredients(plan.id, checkedIngredients);
         return cookingPlanDao.getPlan(plan.id);
     }
 
@@ -276,6 +285,41 @@ public class CookingPreparationRepository {
         }
     }
 
+    private void applyCheckedIngredients(String planId, List<String> checkedIngredients) {
+        if (checkedIngredients == null || checkedIngredients.isEmpty()) {
+            return;
+        }
+        List<CookingPlanIngredientEntity> items = cookingPlanDao.getPlanIngredients(planId);
+        for (CookingPlanIngredientEntity item : items) {
+            if (item.missingAmount <= 0.0001d || !isCheckedIngredient(item, checkedIngredients)) {
+                continue;
+            }
+            markBought(planId, item.ingredientId, amountForManualAvailability(item), item.baseUnit);
+        }
+    }
+
+    private boolean isCheckedIngredient(CookingPlanIngredientEntity item, List<String> checkedIngredients) {
+        String ingredientKey = normalizeName(ingredientName(item.ingredientId));
+        String noteKey = normalizeName(item.userNote);
+        for (String checkedIngredient : checkedIngredients) {
+            String checkedKey = normalizeName(checkedIngredient);
+            if (!ingredientKey.isEmpty() && ingredientKey.equals(checkedKey)) {
+                return true;
+            }
+            if (!noteKey.isEmpty() && noteKey.equals(checkedKey)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private double amountForManualAvailability(CookingPlanIngredientEntity item) {
+        if (isPresenceOnly(item)) {
+            return 1d;
+        }
+        return Math.max(0d, item.missingAmount);
+    }
+
     private ShoppingItemEntity findShoppingProgressItem(String planId, CookingPlanIngredientEntity item,
                                                        List<ShoppingItemEntity> shoppingItems) {
         String ingredientKey = normalizeName(ingredientName(item.ingredientId));
@@ -312,6 +356,9 @@ public class CookingPreparationRepository {
     }
 
     private void seedBaseIngredientsIfNeeded() {
+        if (seedSynced) {
+            return;
+        }
         List<IngredientEntity> seedIngredients = new IngredientSeedData().createIngredients();
         ingredientDao.upsertAll(seedIngredients);
         for (IngredientEntity ingredient : seedIngredients) {
@@ -319,6 +366,7 @@ public class CookingPreparationRepository {
                 ingredientDao.update(ingredient);
             }
         }
+        seedSynced = true;
     }
 
     private List<RecipeIngredientEntity> ensureRecipeIngredients(RecipeEntity recipe) {

@@ -12,6 +12,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.sotaynauan.ai.R;
@@ -41,6 +42,7 @@ import com.sotaynauan.ai.ui.shopping.ShoppingPlanActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingListActivity;
 import com.sotaynauan.ai.util.RecipeImageResolver;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -71,6 +73,7 @@ public class RecipeDetailActivity extends Activity {
     private Button shoppingButton;
     private Button prepareButton;
     private Button startCookingButton;
+    private boolean startCookingInProgress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -177,7 +180,8 @@ public class RecipeDetailActivity extends Activity {
         ingredientTitle.setText("Danh sách (" + recipe.getIngredients().size() + ")");
         ingredientAdapter.bind(ingredientContainer, recipe.getIngredients(), state.getCheckedIngredients());
         stepAdapter.bind(stepContainer, recipe.getSteps());
-        startCookingButton.setEnabled(true);
+        startCookingButton.setEnabled(!startCookingInProgress);
+        startCookingButton.setAlpha(startCookingInProgress ? 0.72f : 1f);
         shoppingButton.setEnabled(true);
         prepareButton.setEnabled(true);
         favoriteButton.setEnabled(true);
@@ -205,20 +209,47 @@ public class RecipeDetailActivity extends Activity {
     }
 
     private void handleStartCooking() {
-        if (currentState == null || !currentState.hasRecipe()) {
+        if (startCookingInProgress || currentState == null || !currentState.hasRecipe()) {
             return;
         }
-        try {
-            CookingPlanEntity plan = preparationRepository.preparePlanFromRecipe(recipeId, 0);
-            List<CookingPlanIngredientEntity> missingIngredients =
-                    preparationRepository.getMissingIngredients(plan.id);
-            if (missingIngredients.isEmpty()) {
-                openCookingMode(plan.id);
-                return;
+        long targetRecipeId = recipeId;
+        List<String> checkedIngredients = new ArrayList<>(currentState.getCheckedIngredients());
+        setStartCookingBusy(true, "Đang kiểm tra kho nguyên liệu...");
+        new Thread(() -> {
+            try {
+                CookingPlanEntity plan = preparationRepository
+                        .preparePlanFromRecipe(targetRecipeId, 0, checkedIngredients);
+                List<CookingPlanIngredientEntity> missingIngredients =
+                        preparationRepository.getMissingIngredients(plan.id);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+                    setStartCookingBusy(false, "");
+                    if (missingIngredients.isEmpty()) {
+                        openCookingMode(plan.id);
+                    } else {
+                        showMissingIngredientsDialog(plan.id, missingIngredients);
+                    }
+                });
+            } catch (Exception exception) {
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+                    setStartCookingBusy(false, "Chưa thể bắt đầu nấu: " + exception.getMessage());
+                });
             }
-            showMissingIngredientsDialog(plan.id, missingIngredients);
-        } catch (IllegalStateException exception) {
-            statusText.setText("Chưa thể bắt đầu nấu: " + exception.getMessage());
+        }).start();
+    }
+
+    private void setStartCookingBusy(boolean busy, String message) {
+        startCookingInProgress = busy;
+        startCookingButton.setEnabled(!busy);
+        startCookingButton.setAlpha(busy ? 0.72f : 1f);
+        startCookingButton.setText(busy ? "Đang kiểm tra..." : "Bắt đầu nấu");
+        if (message != null && !message.trim().isEmpty()) {
+            statusText.setText(message);
         }
     }
 
@@ -247,10 +278,14 @@ public class RecipeDetailActivity extends Activity {
         for (CookingPlanIngredientEntity ingredient : missingIngredients) {
             content.addView(createMissingIngredientRow(ingredient));
         }
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.addView(content);
+        scrollView.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(420)));
 
         new AlertDialog.Builder(this)
                 .setTitle("Thiếu nguyên liệu")
-                .setView(content)
+                .setView(scrollView)
                 .setPositiveButton("Thêm vào danh sách đi chợ", (dialog, which) -> {
                     int added = preparationRepository.addMissingIngredientsToShoppingList(planId);
                     statusText.setText("Đã thêm " + added + " nguyên liệu cần mua vào danh sách đi chợ.");
