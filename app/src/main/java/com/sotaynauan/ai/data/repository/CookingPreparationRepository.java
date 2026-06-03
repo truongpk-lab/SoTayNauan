@@ -385,6 +385,7 @@ public class CookingPreparationRepository {
             recipeIngredients.add(parsed.recipeIngredient);
         }
         ingredientDao.upsertAll(ingredients);
+        resolveRecipeIngredientReferences(ingredients, recipeIngredients);
         recipeDao.upsertRecipeIngredients(recipeIngredients);
         return recipeIngredients;
     }
@@ -402,11 +403,25 @@ public class CookingPreparationRepository {
         }
         if (!ingredients.isEmpty()) {
             ingredientDao.upsertAll(ingredients);
+            resolveRecipeIngredientReferences(ingredients, recipeIngredients);
         }
         if (!recipeIngredients.isEmpty() && recipeDao.getRecipeIngredients(recipe.id).isEmpty()) {
             recipeDao.upsertRecipeIngredients(recipeIngredients);
         }
         return recipeIngredients;
+    }
+
+    private void resolveRecipeIngredientReferences(List<IngredientEntity> parsedIngredients,
+                                                   List<RecipeIngredientEntity> recipeIngredients) {
+        for (int index = 0; index < parsedIngredients.size() && index < recipeIngredients.size(); index++) {
+            IngredientEntity resolved = ingredientDao.findByNormalizedName(parsedIngredients.get(index).normalizedName);
+            if (resolved == null) {
+                resolved = ingredientDao.findById(parsedIngredients.get(index).id);
+            }
+            if (resolved != null) {
+                recipeIngredients.get(index).ingredientId = resolved.id;
+            }
+        }
     }
 
     private List<String> split(String raw) {

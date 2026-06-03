@@ -237,7 +237,9 @@ public class RecipeDetailActivity extends Activity {
                     if (isFinishing() || isDestroyed()) {
                         return;
                     }
-                    setStartCookingBusy(false, "Chưa thể bắt đầu nấu: " + exception.getMessage());
+                    String message = "Chưa thể bắt đầu nấu: " + safeErrorMessage(exception);
+                    setStartCookingBusy(false, message);
+                    showStartCookingErrorDialog(message);
                 });
             }
         }).start();
@@ -287,12 +289,72 @@ public class RecipeDetailActivity extends Activity {
                 .setTitle("Thiếu nguyên liệu")
                 .setView(scrollView)
                 .setPositiveButton("Thêm vào danh sách đi chợ", (dialog, which) -> {
-                    int added = preparationRepository.addMissingIngredientsToShoppingList(planId);
-                    statusText.setText("Đã thêm " + added + " nguyên liệu cần mua vào danh sách đi chợ.");
-                    startActivity(new Intent(this, ShoppingListActivity.class));
+                    addMissingIngredientsAndOpenShopping(planId);
                 })
                 .setNegativeButton("Bỏ qua", null)
                 .show();
+    }
+
+    private void addMissingIngredientsAndOpenShopping(String planId) {
+        setStartCookingBusy(true, "Đang thêm nguyên liệu thiếu vào danh sách đi chợ...");
+        new Thread(() -> {
+            try {
+                int added = preparationRepository.addMissingIngredientsToShoppingList(planId);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+                    setStartCookingBusy(false,
+                            "Đã thêm " + added + " nguyên liệu cần mua vào danh sách đi chợ.");
+                    startActivity(new Intent(this, ShoppingListActivity.class));
+                });
+            } catch (Exception exception) {
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+                    String message = "Không thể thêm nguyên liệu thiếu: " + safeErrorMessage(exception);
+                    setStartCookingBusy(false, message);
+                    showStartCookingErrorDialog(message);
+                });
+            }
+        }).start();
+    }
+
+    private void showStartCookingErrorDialog(String message) {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(18), dp(6), dp(18), 0);
+
+        TextView intro = new TextView(this);
+        intro.setText(message + "\n\nBạn có thể mở màn chuẩn bị để kiểm tra lại kho và danh sách còn thiếu.");
+        intro.setTextColor(Color.parseColor("#564337"));
+        intro.setTextSize(16);
+        intro.setLineSpacing(dp(3), 1f);
+        content.addView(intro, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        new AlertDialog.Builder(this)
+                .setTitle("Không thể bắt đầu nấu")
+                .setView(content)
+                .setPositiveButton("Mở chuẩn bị", (dialog, which) -> {
+                    Intent intent = new Intent(this, CookingPreparationActivity.class);
+                    intent.putExtra(CookingPreparationActivity.EXTRA_RECIPE_ID, recipeId);
+                    startActivity(intent);
+                })
+                .setNegativeButton("Đóng", null)
+                .show();
+    }
+
+    private String safeErrorMessage(Exception exception) {
+        String message = exception.getMessage();
+        if (message == null || message.trim().isEmpty()) {
+            return exception.getClass().getSimpleName();
+        }
+        if (message.contains("FOREIGN KEY")) {
+            return "dữ liệu nguyên liệu chưa đồng bộ. App đã được cập nhật để tự sửa liên kết, hãy thử lại.";
+        }
+        return message;
     }
 
     private TextView createMissingIngredientRow(CookingPlanIngredientEntity ingredient) {

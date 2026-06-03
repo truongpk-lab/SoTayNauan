@@ -152,6 +152,16 @@ public class CookingPreparationRepositoryTest {
                 database.cookingPlanDao().getPlan(plan.id).status);
     }
 
+    @Test
+    public void parsedIngredientWithExistingNormalizedNameUsesSeedIngredientId() {
+        long recipeId = insertRecipe("Nước cam test", "Cam: 4 quả");
+
+        String planId = preparationRepository.createPlanFromRecipe(recipeId, 2).id;
+
+        CookingPlanIngredientEntity item = onlyItem(planId);
+        assertEquals("orange", item.ingredientId);
+    }
+
     private long insertRecipe(String name, String ingredients) {
         RecipeEntity recipe = new RecipeEntity();
         recipe.name = name;
