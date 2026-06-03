@@ -20,10 +20,10 @@ import java.util.regex.Pattern;
 
 public class ShoppingLocalDataSource {
     private static final Pattern TRAILING_QUANTITY_PATTERN = Pattern.compile(
-            "(.+?)\\s+(\\d+)\\s*(kg|g|gram|l|ml|quả|củ|nhánh|gói|chai|chai nhỏ|mớ|phần|bát|chén)$",
+            "(.+?)\\s+(\\d+)\\s*(kg|g|gram|l|ml|quả|trái|củ|nhánh|cây|lá|gói|bịch|chai|chai nhỏ|lọ|hũ|hộp|lon|ly|mớ|phần|bát|chén|nhúm)$",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern LEADING_QUANTITY_PATTERN = Pattern.compile(
-            "^(\\d+)\\s*(kg|g|gram|l|ml|quả|củ|nhánh|gói|chai|chai nhỏ|mớ|phần|bát|chén)\\s+(.+)$",
+            "^(\\d+)\\s*(kg|g|gram|l|ml|quả|trái|củ|nhánh|cây|lá|gói|bịch|chai|chai nhỏ|lọ|hũ|hộp|lon|ly|mớ|phần|bát|chén|nhúm)\\s+(.+)$",
             Pattern.CASE_INSENSITIVE);
     private static final String PREFS_NAME = "shopping_plan_state";
     private static final String KEY_RECIPE_ID = "recipe_id";
@@ -100,6 +100,22 @@ public class ShoppingLocalDataSource {
                 nextItems.isEmpty()
                         ? "Món này không thiếu nguyên liệu nào."
                         : "Đã thêm nguyên liệu vào danh sách đi chợ. Item trùng tên và cùng đơn vị đã được cộng dồn.");
+    }
+
+    public ShoppingPlanState saveShoppingList(long recipeId, String recipeName, List<String> ingredients) {
+        ShoppingPlanState state = getShoppingList();
+        List<ShoppingPlanItem> mergedItems = new ArrayList<>(state.getItems());
+        List<ShoppingPlanItem> nextItems = toPlanItems(ingredients);
+        for (ShoppingPlanItem item : nextItems) {
+            addOrMergeItem(mergedItems, item.withCommitted(true));
+        }
+        String nextRecipeName = appendRecipeName(state.getRecipeName(), recipeName);
+        long nextRecipeId = state.getRecipeId() > 0L ? state.getRecipeId() : recipeId;
+        return saveItems(nextRecipeId, nextRecipeName, mergedItems,
+                nextItems.isEmpty()
+                        ? "Món này không thiếu nguyên liệu nào."
+                        : "Đã thêm nguyên liệu thiếu vào danh sách đi chợ.",
+                true);
     }
 
     public ShoppingPlanState saveItems(long recipeId, String recipeName, List<ShoppingPlanItem> items,

@@ -44,7 +44,7 @@ echo [1/8] Kiem tra AI backend va YOLO tren may tinh...
 call :check_port 8787 BACKEND_READY
 if not "!BACKEND_READY!"=="1" (
     echo AI backend chua chay tren 127.0.0.1:8787.
-    echo Hay mo terminal khac tai D:\SoTayNauAn\backend roi chay: node server.js
+    echo Hay mo terminal khac tai D:\SoTayNauAn\backend roi chay: .\run_backend.bat
     exit /b 1
 )
 call :check_backend_health BACKEND_HEALTH_READY
@@ -52,7 +52,7 @@ if not "!BACKEND_HEALTH_READY!"=="1" (
     echo AI backend dang chay nhung YOLO detector chua san sang.
     if defined BACKEND_HEALTH_ERROR echo Ly do: !BACKEND_HEALTH_ERROR!
     echo Hay chay backend\yolo_detector tren port 8790 va dat YOLO_DETECT_URL=http://127.0.0.1:8790/detect.
-    echo Neu vua sua backend\.env, hay tat terminal node server.js va chay lai node server.js.
+    echo Neu vua sua backend\.env, hay tat Terminal 2 va chay lai .\run_backend.bat.
     exit /b 1
 )
 

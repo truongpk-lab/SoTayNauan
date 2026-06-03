@@ -83,6 +83,15 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+server.on("error", error => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`Khong the chay AI backend: port ${PORT} dang duoc su dung.`);
+    console.error("Hay dung terminal backend dang mo, dong tien trinh cu, hoac doi PORT trong backend/.env.");
+    process.exit(1);
+  }
+  throw error;
+});
+
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`AI backend listening on http://localhost:${PORT}`);
 });

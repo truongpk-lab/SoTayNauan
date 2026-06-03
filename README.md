@@ -17,12 +17,10 @@ Sau khi clone/pull, Android Studio se tao `local.properties` theo may. Neu can t
 sdk.dir=C\:\\Users\\<TEN_USER>\\AppData\\Local\\Android\\Sdk
 ```
 
-Backend dung file rieng `backend\.env` va khong commit API key. Tao tu template:
+Backend dung file rieng `backend\.env` va khong commit API key. Tao tu template trong PowerShell/CMD:
 
-```powershell
-cd D:\SoTayNauAn\backend
-copy .env.example .env
-```
+    cd D:\SoTayNauAn\backend
+    copy .env.example .env
 
 Neu can day du chuc nang Gemini/voice, dien `GEMINI_API_KEY` trong `backend\.env`. Cac bien YOLO mac dinh:
 
@@ -35,27 +33,22 @@ YOLO_MODEL_ID=original_yolov8s
 ## Khoi chay moi bang 3 terminal
 
 Mo 3 terminal Windows rieng biet. De Terminal 1 va Terminal 2 tiep tuc chay, roi chay Terminal 3.
+Neu PowerShell hien dau nhac `>>` sau khi lo copy ba dau backtick tu Markdown, bam `Ctrl+C` de thoat ve `PS D:\SoTayNauAn>`.
 
 Terminal 1 - YOLO detector:
 
-```powershell
-cd D:\SoTayNauAn\backend\yolo_detector
-.\run_yolo_detector.bat
-```
+    cd D:\SoTayNauAn
+    .\run_yolo_detector.bat
 
 Terminal 2 - AI backend Node:
 
-```powershell
-cd D:\SoTayNauAn\backend
-.\run_backend.bat
-```
+    cd D:\SoTayNauAn
+    .\run_backend.bat
 
 Terminal 3 - build, cai va mo app Android:
 
-```powershell
-cd D:\SoTayNauAn
-.\run_app.bat
-```
+    cd D:\SoTayNauAn
+    .\run_app.bat
 
 `run_app.bat` se kiem tra backend va YOLO qua `/health`, uu tien dien thoai that neu co, tu mo emulator neu can, build debug APK, cai APK va mo app.
 
@@ -74,10 +67,8 @@ adb reverse tcp:8787 tcp:8787
 
 ## Build APK debug rieng
 
-```powershell
-cd D:\SoTayNauAn
-.\gradlew.bat assembleDebug
-```
+    cd D:\SoTayNauAn
+    .\gradlew.bat assembleDebug
 
 APK sau build:
 

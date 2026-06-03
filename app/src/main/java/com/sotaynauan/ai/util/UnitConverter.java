@@ -63,6 +63,18 @@ public class UnitConverter {
         if ("gram".equals(value) || "gr".equals(value)) {
             return "g";
         }
+        if (value.startsWith("g ")) {
+            return "g";
+        }
+        if (value.startsWith("kg ")) {
+            return "kg";
+        }
+        if (value.startsWith("ml ")) {
+            return "ml";
+        }
+        if (value.startsWith("l ")) {
+            return "l";
+        }
         if ("lit".equals(value) || "liter".equals(value) || "lít".equals(value)) {
             return "l";
         }
@@ -72,10 +84,14 @@ public class UnitConverter {
         if (value.contains("muong ca phe") || value.contains("thia ca phe")) {
             return "tsp";
         }
-        if ("qua".equals(value) || "cai".equals(value) || "tep".equals(value)
-                || "mieng".equals(value) || "cu".equals(value) || "nhanh".equals(value)
+        if ("qua".equals(value) || "trai".equals(value) || "cai".equals(value)
+                || "tep".equals(value) || "mieng".equals(value) || "cu".equals(value)
+                || "nhanh".equals(value) || "cay".equals(value) || "la".equals(value)
                 || "o".equals(value) || "phan".equals(value) || "chen".equals(value)
-                || "bat".equals(value) || "goi".equals(value) || "chai".equals(value)
+                || "bat".equals(value) || "goi".equals(value) || "bich".equals(value)
+                || "chai".equals(value) || "lo".equals(value) || "hu".equals(value)
+                || "hop".equals(value) || "lon".equals(value) || "ly".equals(value)
+                || "mui".equals(value) || "nhum".equals(value) || "it".equals(value)
                 || "nam".equals(value) || "bo".equals(value)) {
             return "piece";
         }

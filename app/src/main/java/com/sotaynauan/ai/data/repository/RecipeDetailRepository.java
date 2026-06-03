@@ -61,6 +61,16 @@ public class RecipeDetailRepository {
                 + " nguyên liệu vào danh sách đi chợ local.");
     }
 
+    public RecipeDetailState addMissingIngredientsToShopping(long recipeId, List<String> missingIngredients) {
+        Recipe recipe = recipeRepository.findRecipe(recipeId);
+        if (recipe == null) {
+            return loadRecipeDetail(recipeId);
+        }
+        shoppingRepository.saveShoppingListForRecipe(recipe.getId(), recipe.getName(), missingIngredients);
+        return createState(recipe, "Đã thêm " + missingIngredients.size()
+                + " nguyên liệu cần mua vào danh sách đi chợ.");
+    }
+
     private RecipeDetailState createState(Recipe recipe, String statusMessage) {
         return new RecipeDetailState(recipe,
                 localDataSource.isFavoriteRecipe(recipe.getId()),

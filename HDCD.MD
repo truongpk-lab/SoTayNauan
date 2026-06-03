@@ -18,17 +18,13 @@ Android Studio thuong co san JDK. Neu Gradle bao `JAVA_HOME is not set`, hay bui
 
 Mo PowerShell/CMD tai thu muc muon dat project:
 
-```powershell
-git clone <GIT_REPO_URL> SoTayNauAn
-cd SoTayNauAn
-```
+    git clone <GIT_REPO_URL> SoTayNauAn
+    cd SoTayNauAn
 
 Neu da co repo:
 
-```powershell
-cd D:\SoTayNauAn
-git pull
-```
+    cd D:\SoTayNauAn
+    git pull
 
 Sau khi pull, can co cac file/thu muc chinh:
 
@@ -70,10 +66,8 @@ Khong can tu dat `AI_BACKEND_BASE_URL` khi chay bang `run_app.bat`. Script se tu
 
 Backend Node doc cau hinh tu `backend\.env`. File nay khong commit de tranh lo API key. Tren may moi, tao tu template:
 
-```powershell
-cd D:\SoTayNauAn\backend
-copy .env.example .env
-```
+    cd D:\SoTayNauAn\backend
+    copy .env.example .env
 
 Mo `backend\.env` va dien `GEMINI_API_KEY` neu can day du chuc nang Gemini/voice. Cac bien YOLO nen giu mac dinh:
 
@@ -91,13 +85,12 @@ Neu chua co Gemini key, backend van chay va detector YOLO van hoat dong, nhung c
 ## 6. Cai va chay bang 3 terminal
 
 Mo 3 terminal rieng biet tai Windows. Hay de Terminal 1 va Terminal 2 tiep tuc chay, sau do moi chay Terminal 3.
+Neu PowerShell hien dau nhac `>>` sau khi lo copy ba dau backtick tu Markdown, bam `Ctrl+C` de thoat ve `PS D:\SoTayNauAn>`.
 
 Terminal 1 - chay YOLO detector:
 
-```powershell
-cd D:\SoTayNauAn\backend\yolo_detector
-.\run_yolo_detector.bat
-```
+    cd D:\SoTayNauAn
+    .\run_yolo_detector.bat
 
 Lan dau script se tao `.venv`, cai Python packages tu `requirements.txt`, nap model `models\original_yolov8s\model.pt` va chay service tai:
 
@@ -107,10 +100,8 @@ http://127.0.0.1:8790
 
 Terminal 2 - chay AI backend Node:
 
-```powershell
-cd D:\SoTayNauAn\backend
-.\run_backend.bat
-```
+    cd D:\SoTayNauAn
+    .\run_backend.bat
 
 Backend chay tai:
 
@@ -120,21 +111,23 @@ http://127.0.0.1:8787
 
 Terminal 3 - build, cai va mo app:
 
-```powershell
-cd D:\SoTayNauAn
-.\run_app.bat
-```
+    cd D:\SoTayNauAn
+    .\run_app.bat
 
 `run_app.bat` se kiem tra backend `/health`, chon thiet bi/emulator, build debug APK, cai APK va mo app `com.sotaynauan.ai`.
 
-## 7. Build APK rieng
+## 7. Du lieu local va DB nguyen lieu
+
+App dung Room local-first. Khi tao/kiem tra ke hoach nau, app tu seed bang `ingredients` voi cac nhom pho bien nhu `meat`, `seafood`, `protein`, `grain`, `noodle`, `vegetable`, `fruit`, `spice`, `sauce`, `oil`, `liquid`, `dairy`, `frozen`.
+
+Khong can chay script DB rieng tren may moi. Neu may da cai ban cu, app se bo sung seed moi va cap nhat lai cac ingredient seed co cung `id` de phan nhom nguyen lieu/gia vi dung hon.
+
+## 8. Build APK rieng
 
 Neu chi muon build APK debug:
 
-```powershell
-cd D:\SoTayNauAn
-.\gradlew.bat assembleDebug
-```
+    cd D:\SoTayNauAn
+    .\gradlew.bat assembleDebug
 
 APK nam tai:
 
@@ -148,7 +141,7 @@ Neu dang o WSL va chua co Java/Linux Android SDK, goi wrapper Windows:
 cmd.exe /c gradlew.bat assembleDebug
 ```
 
-## 8. Kiem tra nhanh sau khi cai moi
+## 9. Kiem tra nhanh sau khi cai moi
 
 ```text
 [ ] Android Studio sync thanh cong.
@@ -158,9 +151,10 @@ cmd.exe /c gradlew.bat assembleDebug
 [ ] Terminal 1 YOLO detector dang chay port 8790.
 [ ] Terminal 2 AI backend dang chay port 8787 va /health bao yoloReady=true.
 [ ] Terminal 3 .\run_app.bat build, cai va mo app thanh cong.
+[ ] Vao mot cong thuc, bam chuan bi/bat dau nau de Room seed nhom nguyen lieu va gia vi.
 ```
 
-## 9. Loi thuong gap
+## 10. Loi thuong gap
 
 ### `adb is not recognized`
 

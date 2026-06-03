@@ -34,6 +34,10 @@ public class ShoppingRepository {
         return localDataSource.savePlan(recipe.getId(), recipe.getName(), recipe.getIngredients());
     }
 
+    public ShoppingPlanState saveShoppingListForRecipe(long recipeId, String recipeName, List<String> ingredients) {
+        return localDataSource.saveShoppingList(recipeId, recipeName, ingredients);
+    }
+
     public ShoppingPlanState updateItemStatus(String itemId, ShoppingItemStatus status) {
         return localDataSource.updateStatus(itemId, status);
     }

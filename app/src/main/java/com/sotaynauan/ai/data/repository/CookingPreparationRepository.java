@@ -18,6 +18,7 @@ import com.sotaynauan.ai.data.local.entity.ShoppingItemEntity;
 import com.sotaynauan.ai.data.model.ShoppingItemStatus;
 import com.sotaynauan.ai.data.seed.IngredientSeedData;
 import com.sotaynauan.ai.data.seed.RecipeIngredientParser;
+import com.sotaynauan.ai.util.IngredientUsageRules;
 import com.sotaynauan.ai.util.UnitConverter;
 
 import java.util.ArrayList;
@@ -79,12 +80,14 @@ public class CookingPreparationRepository {
 
         List<CookingPlanIngredientEntity> items = new ArrayList<>();
         for (RecipeIngredientEntity recipeIngredient : recipeIngredients) {
+            IngredientEntity ingredient = ingredientDao.findById(recipeIngredient.ingredientId);
+            boolean presenceOnly = isPresenceOnly(ingredient, recipeIngredient.note, recipeIngredient.unit);
             CookingPlanIngredientEntity item = new CookingPlanIngredientEntity();
             item.planId = plan.id;
             item.ingredientId = recipeIngredient.ingredientId;
-            item.requiredAmount = Math.max(0d, recipeIngredient.amount * multiplier);
+            item.requiredAmount = presenceOnly ? 1d : Math.max(0d, recipeIngredient.amount * multiplier);
             item.missingAmount = item.requiredAmount;
-            item.baseUnit = recipeIngredient.unit;
+            item.baseUnit = presenceOnly ? "piece" : recipeIngredient.unit;
             item.prepareStatus = CookingPlanIngredientEntity.STATUS_NEED_CHECK;
             item.userNote = recipeIngredient.note;
             item.updatedAt = now;
@@ -92,6 +95,12 @@ public class CookingPreparationRepository {
         }
         cookingPlanDao.upsertPlanIngredients(items);
         return plan;
+    }
+
+    public CookingPlanEntity preparePlanFromRecipe(long recipeId, int targetServings) {
+        CookingPlanEntity plan = createPlanFromRecipe(recipeId, targetServings);
+        applyCommittedShoppingProgress(plan.id);
+        return cookingPlanDao.getPlan(plan.id);
     }
 
     public void markHaveAtHome(String planId, String ingredientId, double selectedAmount, String unit) {
@@ -179,6 +188,31 @@ public class CookingPreparationRepository {
         return true;
     }
 
+    public List<CookingPlanIngredientEntity> getMissingIngredients(String planId) {
+        List<CookingPlanIngredientEntity> missing = new ArrayList<>();
+        for (CookingPlanIngredientEntity item : cookingPlanDao.getPlanIngredients(planId)) {
+            if (item.missingAmount > 0.0001d) {
+                missing.add(item);
+            }
+        }
+        return missing;
+    }
+
+    public int addMissingIngredientsToShoppingList(String planId) {
+        final int[] added = {0};
+        database.runInTransaction(() -> {
+            long now = System.currentTimeMillis();
+            for (CookingPlanIngredientEntity item : cookingPlanDao.getPlanIngredients(planId)) {
+                if (item.missingAmount <= 0.0001d) {
+                    continue;
+                }
+                syncShoppingListItem(item, now);
+                added[0]++;
+            }
+        });
+        return added[0];
+    }
+
     public void completeCooking(String planId) {
         inventoryRepository.consumeForCompletedCooking(planId);
     }
@@ -212,13 +246,79 @@ public class CookingPreparationRepository {
         return ingredientDao.findById(ingredientId);
     }
 
+    public boolean isPresenceOnly(CookingPlanIngredientEntity item) {
+        return isPresenceOnly(ingredientDao.findById(item.ingredientId), item.userNote, item.baseUnit);
+    }
+
     public double getAvailableAmount(String ingredientId) {
         PantryStockEntity stock = pantryDao.getStock(ingredientId);
         return stock == null ? 0d : Math.max(0d, stock.totalAmount - stock.reservedAmount);
     }
 
+    private void applyCommittedShoppingProgress(String planId) {
+        List<ShoppingItemEntity> shoppingItems = shoppingItemDao.getItemsByCommitted(true);
+        if (shoppingItems.isEmpty()) {
+            return;
+        }
+        for (CookingPlanIngredientEntity item : cookingPlanDao.getPlanIngredients(planId)) {
+            if (item.missingAmount <= 0.0001d) {
+                continue;
+            }
+            ShoppingItemEntity shoppingItem = findShoppingProgressItem(planId, item, shoppingItems);
+            if (shoppingItem == null) {
+                continue;
+            }
+            ShoppingItemStatus status = ShoppingItemStatus.fromName(shoppingItem.status);
+            if (status == ShoppingItemStatus.BOUGHT || status == ShoppingItemStatus.AT_HOME) {
+                markBought(planId, item.ingredientId, amountForProgress(item, shoppingItem),
+                        unitForProgress(item, shoppingItem));
+            }
+        }
+    }
+
+    private ShoppingItemEntity findShoppingProgressItem(String planId, CookingPlanIngredientEntity item,
+                                                       List<ShoppingItemEntity> shoppingItems) {
+        String ingredientKey = normalizeName(ingredientName(item.ingredientId));
+        String noteKey = normalizeName(item.userNote);
+        for (ShoppingItemEntity shoppingItem : shoppingItems) {
+            if (planId.equals(shoppingItem.planId) && item.ingredientId.equals(shoppingItem.ingredientId)) {
+                return shoppingItem;
+            }
+            String itemKey = normalizeName(shoppingItem.name);
+            if (!ingredientKey.isEmpty() && itemKey.equals(ingredientKey)) {
+                return shoppingItem;
+            }
+            if (!noteKey.isEmpty() && itemKey.equals(noteKey)) {
+                return shoppingItem;
+            }
+        }
+        return null;
+    }
+
+    private double amountForProgress(CookingPlanIngredientEntity item, ShoppingItemEntity shoppingItem) {
+        if (isPresenceOnly(item)) {
+            return 1d;
+        }
+        return Math.max(item.missingAmount, shoppingItem.amount);
+    }
+
+    private String unitForProgress(CookingPlanIngredientEntity item, ShoppingItemEntity shoppingItem) {
+        if (isPresenceOnly(item)) {
+            return "piece";
+        }
+        return shoppingItem.unit == null || shoppingItem.unit.trim().isEmpty()
+                ? item.baseUnit
+                : shoppingItem.unit;
+    }
+
     private void seedBaseIngredientsIfNeeded() {
-        ingredientDao.upsertAll(new IngredientSeedData().createIngredients());
+        List<IngredientEntity> seedIngredients = new IngredientSeedData().createIngredients();
+        ingredientDao.upsertAll(seedIngredients);
+        for (IngredientEntity ingredient : seedIngredients) {
+            if (ingredientDao.findById(ingredient.id) != null) {
+                ingredientDao.update(ingredient);
+            }
+        }
     }
 
     private List<RecipeIngredientEntity> ensureRecipeIngredients(RecipeEntity recipe) {
@@ -348,18 +448,46 @@ public class CookingPreparationRepository {
             shoppingItem.recipeId = planRecipeId(item.planId);
             shoppingItem.name = ingredientName(item.ingredientId);
             shoppingItem.displayName = shoppingItem.name;
-            shoppingItem.unit = item.baseUnit;
-            shoppingItem.baseUnit = item.baseUnit;
-            shoppingItem.category = "Nguyên liệu chính";
+            shoppingItem.category = isPresenceOnly(item) ? "Gia vị & Khác" : "Nguyên liệu chính";
             shoppingItem.createdAt = now;
             shoppingItem.committed = false;
         }
-        shoppingItem.amount = displayAmount(item.missingAmount);
+        shoppingItem.amount = displayAmount(item);
         shoppingItem.requiredAmount = item.missingAmount;
         shoppingItem.boughtAmount = item.purchasedAmount;
         shoppingItem.status = item.missingAmount <= 0.0001d
                 ? ShoppingItemStatus.AT_HOME.name()
                 : ShoppingItemStatus.NEED_BUY.name();
+        shoppingItem.unit = displayUnit(item);
+        shoppingItem.baseUnit = item.baseUnit;
+        shoppingItem.updatedAt = now;
+        shoppingItem.updatedAtMillis = now;
+        shoppingItemDao.upsert(shoppingItem);
+    }
+
+    private void syncShoppingListItem(CookingPlanIngredientEntity item, long now) {
+        ShoppingItemEntity shoppingItem = shoppingItemDao.findById(
+                "list|" + item.planId + "_" + item.ingredientId);
+        if (shoppingItem == null) {
+            shoppingItem = new ShoppingItemEntity();
+            shoppingItem.id = "list|" + item.planId + "_" + item.ingredientId;
+            shoppingItem.planId = item.planId;
+            shoppingItem.ingredientId = item.ingredientId;
+            shoppingItem.recipeId = planRecipeId(item.planId);
+            shoppingItem.recipeName = recipeName(shoppingItem.recipeId);
+            shoppingItem.name = ingredientName(item.ingredientId);
+            shoppingItem.displayName = shoppingItem.name;
+            shoppingItem.note = item.userNote;
+            shoppingItem.category = isPresenceOnly(item) ? "Gia vị & Khác" : "Nguyên liệu chính";
+            shoppingItem.createdAt = now;
+            shoppingItem.committed = true;
+        }
+        shoppingItem.amount = displayAmount(item);
+        shoppingItem.requiredAmount = item.missingAmount;
+        shoppingItem.boughtAmount = item.purchasedAmount;
+        shoppingItem.status = ShoppingItemStatus.NEED_BUY.name();
+        shoppingItem.unit = displayUnit(item);
+        shoppingItem.baseUnit = item.baseUnit;
         shoppingItem.updatedAt = now;
         shoppingItem.updatedAtMillis = now;
         shoppingItemDao.upsert(shoppingItem);
@@ -374,12 +502,14 @@ public class CookingPreparationRepository {
         if (shoppingItem == null) {
             return;
         }
-        shoppingItem.amount = displayAmount(Math.max(0d, item.missingAmount));
+        shoppingItem.amount = displayAmount(item);
         shoppingItem.requiredAmount = item.missingAmount;
         shoppingItem.boughtAmount += boughtBase;
         shoppingItem.status = item.missingAmount <= 0.0001d
                 ? ShoppingItemStatus.BOUGHT.name()
                 : ShoppingItemStatus.NEED_BUY.name();
+        shoppingItem.unit = displayUnit(item);
+        shoppingItem.baseUnit = item.baseUnit;
         shoppingItem.updatedAt = now;
         shoppingItem.updatedAtMillis = now;
         shoppingItemDao.upsert(shoppingItem);
@@ -395,8 +525,45 @@ public class CookingPreparationRepository {
         return ingredient == null ? ingredientId : ingredient.name;
     }
 
-    private int displayAmount(double amount) {
-        return Math.max(1, (int) Math.ceil(amount));
+    private String recipeName(long recipeId) {
+        RecipeEntity recipe = recipeDao.findById(recipeId);
+        return recipe == null ? "" : recipe.name;
+    }
+
+    private int displayAmount(CookingPlanIngredientEntity item) {
+        if (isPresenceOnly(item)) {
+            return 1;
+        }
+        return Math.max(1, (int) Math.ceil(Math.max(0d, item.missingAmount)));
+    }
+
+    private String displayUnit(CookingPlanIngredientEntity item) {
+        return isPresenceOnly(item) ? IngredientUsageRules.presenceUnit() : item.baseUnit;
+    }
+
+    private boolean isPresenceOnly(IngredientEntity ingredient, String note, String unit) {
+        return IngredientUsageRules.isPresenceOnly(
+                ingredient == null ? "" : ingredient.name,
+                ingredient == null ? "" : ingredient.category,
+                note,
+                unit);
+    }
+
+    private String displayIngredientName(String raw) {
+        String value = raw == null ? "" : raw.trim();
+        int colonIndex = value.indexOf(':');
+        if (colonIndex > 0) {
+            value = value.substring(0, colonIndex);
+        }
+        int dashIndex = value.indexOf(" - ");
+        if (dashIndex >= 0 && dashIndex < value.length() - 3) {
+            value = value.substring(dashIndex + 3);
+        }
+        return value.trim();
+    }
+
+    private String normalizeName(String value) {
+        return IngredientSeedData.normalizeName(displayIngredientName(value));
     }
 
     private InventoryTransactionEntity transaction(String ingredientId, String planId, Long batchId,

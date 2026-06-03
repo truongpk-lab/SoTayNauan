@@ -10,6 +10,7 @@ import com.sotaynauan.ai.data.local.entity.IngredientEntity;
 import com.sotaynauan.ai.data.local.entity.InventoryTransactionEntity;
 import com.sotaynauan.ai.data.local.entity.PantryBatchEntity;
 import com.sotaynauan.ai.data.local.entity.PantryStockEntity;
+import com.sotaynauan.ai.util.IngredientUsageRules;
 import com.sotaynauan.ai.util.UnitConverter;
 
 import java.util.List;
@@ -133,20 +134,28 @@ public class InventoryRepository {
                 if (item.missingAmount > 0.0001d) {
                     throw new IllegalStateException("Ingredient is still missing: " + item.ingredientId);
                 }
-                consumeFromBatches(planId, item.ingredientId, item.requiredAmount, item.baseUnit, now);
+                boolean presenceOnly = isPresenceOnly(item);
                 PantryStockEntity stock = ensureStock(item.ingredientId, item.baseUnit);
-                stock.totalAmount = Math.max(0d, stock.totalAmount - item.requiredAmount);
+                if (!presenceOnly) {
+                    consumeFromBatches(planId, item.ingredientId, item.requiredAmount, item.baseUnit, now);
+                    stock.totalAmount = Math.max(0d, stock.totalAmount - item.requiredAmount);
+                }
                 stock.reservedAmount = Math.max(0d, stock.reservedAmount - item.reservedAmount);
                 stock.lastUpdatedAt = now;
                 pantryDao.upsertStock(stock);
 
-                item.consumedAmount = item.requiredAmount;
+                item.consumedAmount = presenceOnly ? 0d : item.requiredAmount;
                 item.prepareStatus = CookingPlanIngredientEntity.STATUS_CONSUMED;
                 item.updatedAt = now;
                 cookingPlanDao.upsertPlanIngredient(item);
                 pantryDao.insertTransaction(transaction(item.ingredientId, planId, null,
-                        InventoryTransactionEntity.TYPE_CONSUME_COOKING, -item.requiredAmount,
-                        item.baseUnit, "Consumed after completing cooking", now));
+                        InventoryTransactionEntity.TYPE_CONSUME_COOKING,
+                        presenceOnly ? 0d : -item.requiredAmount,
+                        item.baseUnit,
+                        presenceOnly
+                                ? "Presence-only item checked after cooking"
+                                : "Consumed after completing cooking",
+                        now));
             }
             plan.status = CookingPlanEntity.STATUS_COMPLETED;
             plan.completedAt = now;
@@ -196,6 +205,15 @@ public class InventoryRepository {
         ingredient.updatedAt = now;
         ingredientDao.upsert(ingredient);
         return ingredient;
+    }
+
+    private boolean isPresenceOnly(CookingPlanIngredientEntity item) {
+        IngredientEntity ingredient = ingredientDao.findById(item.ingredientId);
+        return IngredientUsageRules.isPresenceOnly(
+                ingredient == null ? "" : ingredient.name,
+                ingredient == null ? "" : ingredient.category,
+                item.userNote,
+                item.baseUnit);
     }
 
     private PantryStockEntity ensureStock(String ingredientId, String baseUnit) {

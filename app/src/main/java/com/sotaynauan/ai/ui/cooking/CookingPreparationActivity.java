@@ -43,7 +43,7 @@ public class CookingPreparationActivity extends Activity {
         recipeId = getIntent().getLongExtra(EXTRA_RECIPE_ID, -1L);
         planId = getIntent().getStringExtra(EXTRA_PLAN_ID);
         if ((planId == null || planId.trim().isEmpty()) && recipeId > 0L) {
-            CookingPlanEntity plan = repository.createPlanFromRecipe(recipeId, 0);
+            CookingPlanEntity plan = repository.preparePlanFromRecipe(recipeId, 0);
             planId = plan.id;
         }
         buildLayout();
@@ -144,6 +144,7 @@ public class CookingPreparationActivity extends Activity {
         IngredientEntity ingredient = repository.getIngredient(item.ingredientId);
         String name = ingredient == null ? item.ingredientId : ingredient.name;
         double available = repository.getAvailableAmount(item.ingredientId);
+        boolean presenceOnly = repository.isPresenceOnly(item);
 
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
@@ -162,7 +163,10 @@ public class CookingPreparationActivity extends Activity {
         card.addView(nameText);
 
         TextView detailText = new TextView(this);
-        detailText.setText("Cần: " + amountText(item.requiredAmount, item.baseUnit)
+        detailText.setText(presenceOnly
+                ? "Chỉ cần xác nhận là đã có. Kho sẽ không trừ số lượng khi hoàn tất."
+                + "\nTrạng thái: " + (item.missingAmount <= 0.0001d ? "Đã đủ" : "Cần mua hoặc xác nhận đã có")
+                : "Cần: " + amountText(item.requiredAmount, item.baseUnit)
                 + "\nCó thể dùng: " + amountText(available, item.baseUnit)
                 + "\nĐã giữ ở nhà: " + amountText(item.homeSelectedAmount, item.baseUnit)
                 + " • Đã mua: " + amountText(item.purchasedAmount, item.baseUnit)
@@ -184,25 +188,39 @@ public class CookingPreparationActivity extends Activity {
         card.addView(actions, actionParams);
 
         Button homeButton = smallButton("Đã có ở nhà");
-        homeButton.setOnClickListener(view -> showAmountDialog(
-                "Số lượng có ở nhà",
-                Math.min(item.requiredAmount, Math.max(available + item.reservedAmount, item.reservedAmount)),
-                item.baseUnit,
-                amount -> {
-                    repository.markHaveAtHome(planId, item.ingredientId, amount, item.baseUnit);
-                    bindState();
-                }));
+        homeButton.setOnClickListener(view -> {
+            if (presenceOnly) {
+                repository.markBought(planId, item.ingredientId, 1d, "piece");
+                bindState();
+                return;
+            }
+            showAmountDialog(
+                    "Số lượng có ở nhà",
+                    Math.min(item.requiredAmount, Math.max(available + item.reservedAmount, item.reservedAmount)),
+                    item.baseUnit,
+                    amount -> {
+                        repository.markHaveAtHome(planId, item.ingredientId, amount, item.baseUnit);
+                        bindState();
+                    });
+        });
         actions.addView(homeButton, new LinearLayout.LayoutParams(0, dp(48), 1f));
 
         Button boughtButton = smallButton("Đã mua");
-        boughtButton.setOnClickListener(view -> showAmountDialog(
-                "Số lượng đã mua",
-                Math.max(item.missingAmount, 1d),
-                item.baseUnit,
-                amount -> {
-                    repository.markBought(planId, item.ingredientId, amount, item.baseUnit);
-                    bindState();
-                }));
+        boughtButton.setOnClickListener(view -> {
+            if (presenceOnly) {
+                repository.markBought(planId, item.ingredientId, 1d, "piece");
+                bindState();
+                return;
+            }
+            showAmountDialog(
+                    "Số lượng đã mua",
+                    Math.max(item.missingAmount, 1d),
+                    item.baseUnit,
+                    amount -> {
+                        repository.markBought(planId, item.ingredientId, amount, item.baseUnit);
+                        bindState();
+                    });
+        });
         LinearLayout.LayoutParams boughtParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
         boughtParams.setMargins(dp(8), 0, 0, 0);
         actions.addView(boughtButton, boughtParams);

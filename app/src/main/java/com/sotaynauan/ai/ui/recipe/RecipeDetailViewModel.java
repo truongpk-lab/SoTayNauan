@@ -5,6 +5,8 @@ import com.sotaynauan.ai.data.model.RecipeDetailState;
 import com.sotaynauan.ai.data.repository.CookingRepository;
 import com.sotaynauan.ai.data.repository.RecipeDetailRepository;
 
+import java.util.List;
+
 public class RecipeDetailViewModel {
     private final RecipeDetailRepository recipeDetailRepository;
     private final CookingRepository cookingRepository;
@@ -31,7 +33,15 @@ public class RecipeDetailViewModel {
         return recipeDetailRepository.addIngredientsToShopping(recipeId);
     }
 
+    public RecipeDetailState addMissingIngredientsToShopping(long recipeId, List<String> missingIngredients) {
+        return recipeDetailRepository.addMissingIngredientsToShopping(recipeId, missingIngredients);
+    }
+
     public CookingSessionState startCooking(long recipeId) {
         return cookingRepository.startSession(recipeId);
+    }
+
+    public CookingSessionState startCooking(long recipeId, String planId) {
+        return cookingRepository.startSession(recipeId, planId);
     }
 }

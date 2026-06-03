@@ -74,23 +74,62 @@ public class RecipeIngredientParser {
     }
 
     private String inferCategory(String normalizedName) {
-        if (normalizedName.contains("thit") || normalizedName.contains("bo")
-                || normalizedName.contains("ga") || normalizedName.contains("ca")
-                || normalizedName.contains("tom") || normalizedName.contains("muc")
-                || normalizedName.contains("trung")) {
-            return "meat";
+        if (containsAny(normalizedName, "nuoc loc", "nuoc dua", "nuoc soi", "nuoc lanh")) {
+            return "liquid";
         }
-        if (normalizedName.contains("rau") || normalizedName.contains("hanh")
-                || normalizedName.contains("ca chua") || normalizedName.contains("dua")
-                || normalizedName.contains("gia") || normalizedName.contains("nam")) {
-            return "vegetable";
+        if (containsAny(normalizedName, "da vien", "da lanh")) {
+            return "frozen";
         }
-        if (normalizedName.contains("nuoc mam") || normalizedName.contains("dau")
-                || normalizedName.contains("muoi") || normalizedName.contains("duong")
-                || normalizedName.contains("tieu")) {
+        if (containsAny(normalizedName, "nuoc mam", "nuoc tuong", "xi dau", "dau hao",
+                "tuong ot", "tuong ca", "sa te", "giam", "dam")) {
+            return "sauce";
+        }
+        if (containsAny(normalizedName, "dau an", "dau me", "dau oliu", "dau olive")) {
+            return "oil";
+        }
+        if (containsAny(normalizedName, "muoi", "duong", "tieu", "bot ngot", "mi chinh",
+                "hat nem", "bot nem", "ngu vi huong", "bot ca ri", "bot nghe", "ot bot",
+                "toi", "gung", "sa", "ot", "mat ong")) {
             return "spice";
         }
+        if (containsAny(normalizedName, "tom", "muc", "cua", "ngheu", "ngao", "so",
+                "hen", "ca hoi", "ca thu", "ca basa", "ca loc", "ca ro", "ca ngu")
+                || "ca".equals(normalizedName)) {
+            return "seafood";
+        }
+        if (containsAny(normalizedName, "thit", "bo", "heo", "lon", "ga", "vit",
+                "suon", "ba chi", "ba roi")) {
+            return "meat";
+        }
+        if (containsAny(normalizedName, "trung", "dau hu", "dau phu", "tau hu", "xuc xich")) {
+            return "protein";
+        }
+        if (containsAny(normalizedName, "gao", "nep", "bot mi", "bot gao", "com")) {
+            return "grain";
+        }
+        if (containsAny(normalizedName, "mi", "bun", "pho", "hu tieu", "mien", "nui")) {
+            return "noodle";
+        }
+        if (containsAny(normalizedName, "chanh", "cam", "thom", "dua", "khom", "chuoi", "bo")) {
+            return "fruit";
+        }
+        if (containsAny(normalizedName, "rau", "hanh", "ca chua", "dua leo", "dua chuot",
+                "gia", "nam", "cai", "bap cai", "ca rot", "khoai tay", "bap", "ngo")) {
+            return "vegetable";
+        }
+        if (containsAny(normalizedName, "sua", "phomai", "pho mai", "bo lat")) {
+            return "dairy";
+        }
         return "other";
+    }
+
+    private boolean containsAny(String value, String... needles) {
+        for (String needle : needles) {
+            if (value.contains(needle)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private double parseAmount(String value) {

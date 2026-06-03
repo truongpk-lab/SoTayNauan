@@ -1,10 +1,14 @@
 package com.sotaynauan.ai.ui.recipe;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.view.Gravity;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -18,10 +22,14 @@ import com.sotaynauan.ai.data.local.datasource.CookingLocalDataSource;
 import com.sotaynauan.ai.data.local.datasource.RecipeDetailLocalDataSource;
 import com.sotaynauan.ai.data.local.datasource.RecipeLocalDataSource;
 import com.sotaynauan.ai.data.local.datasource.ShoppingLocalDataSource;
+import com.sotaynauan.ai.data.local.entity.CookingPlanEntity;
+import com.sotaynauan.ai.data.local.entity.CookingPlanIngredientEntity;
+import com.sotaynauan.ai.data.local.entity.IngredientEntity;
 import com.sotaynauan.ai.data.mapper.RecipeMapper;
 import com.sotaynauan.ai.data.model.CookingSessionState;
 import com.sotaynauan.ai.data.model.Recipe;
 import com.sotaynauan.ai.data.model.RecipeDetailState;
+import com.sotaynauan.ai.data.repository.CookingPreparationRepository;
 import com.sotaynauan.ai.data.repository.CookingRepository;
 import com.sotaynauan.ai.data.repository.RecipeDetailRepository;
 import com.sotaynauan.ai.data.repository.RecipeRepository;
@@ -30,14 +38,17 @@ import com.sotaynauan.ai.data.seed.SeedDataProvider;
 import com.sotaynauan.ai.ui.cooking.CookingPreparationActivity;
 import com.sotaynauan.ai.ui.cooking.CookingModeActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingPlanActivity;
+import com.sotaynauan.ai.ui.shopping.ShoppingListActivity;
 import com.sotaynauan.ai.util.RecipeImageResolver;
 
+import java.util.List;
 import java.util.Locale;
 
 public class RecipeDetailActivity extends Activity {
     public static final String EXTRA_RECIPE_ID = "extra_recipe_id";
 
     private RecipeDetailViewModel viewModel;
+    private CookingPreparationRepository preparationRepository;
     private RecipeIngredientAdapter ingredientAdapter;
     private RecipeStepAdapter stepAdapter;
     private long recipeId;
@@ -67,6 +78,7 @@ public class RecipeDetailActivity extends Activity {
         setContentView(R.layout.activity_recipe_detail);
 
         recipeId = getIntent().getLongExtra(EXTRA_RECIPE_ID, -1L);
+        preparationRepository = new CookingPreparationRepository(AppDatabase.getInstance(this));
         viewModel = createViewModel();
         ingredientAdapter = new RecipeIngredientAdapter(this,
                 ingredient -> bindState(viewModel.toggleIngredient(recipeId, ingredient)));
@@ -129,9 +141,7 @@ public class RecipeDetailActivity extends Activity {
             startActivity(intent);
         });
         startCookingButton.setOnClickListener(view -> {
-            Intent intent = new Intent(this, CookingPreparationActivity.class);
-            intent.putExtra(CookingPreparationActivity.EXTRA_RECIPE_ID, recipeId);
-            startActivity(intent);
+            handleStartCooking();
         });
     }
 
@@ -194,6 +204,107 @@ public class RecipeDetailActivity extends Activity {
         return "Chuẩn bị đủ nguyên liệu trước khi bật bếp để các bước nấu liền mạch và món giữ được vị ngon.";
     }
 
+    private void handleStartCooking() {
+        if (currentState == null || !currentState.hasRecipe()) {
+            return;
+        }
+        try {
+            CookingPlanEntity plan = preparationRepository.preparePlanFromRecipe(recipeId, 0);
+            List<CookingPlanIngredientEntity> missingIngredients =
+                    preparationRepository.getMissingIngredients(plan.id);
+            if (missingIngredients.isEmpty()) {
+                openCookingMode(plan.id);
+                return;
+            }
+            showMissingIngredientsDialog(plan.id, missingIngredients);
+        } catch (IllegalStateException exception) {
+            statusText.setText("Chưa thể bắt đầu nấu: " + exception.getMessage());
+        }
+    }
+
+    private void openCookingMode(String planId) {
+        viewModel.startCooking(recipeId, planId);
+        Intent intent = new Intent(this, CookingModeActivity.class);
+        intent.putExtra(CookingModeActivity.EXTRA_RECIPE_ID, recipeId);
+        intent.putExtra(CookingPreparationActivity.EXTRA_PLAN_ID, planId);
+        startActivity(intent);
+    }
+
+    private void showMissingIngredientsDialog(String planId,
+                                              List<CookingPlanIngredientEntity> missingIngredients) {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(18), dp(6), dp(18), 0);
+
+        TextView intro = new TextView(this);
+        intro.setText("Bạn còn thiếu nguyên liệu dưới đây. Hãy đi chợ nhé.");
+        intro.setTextColor(Color.parseColor("#564337"));
+        intro.setTextSize(16);
+        intro.setLineSpacing(dp(3), 1f);
+        content.addView(intro, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        for (CookingPlanIngredientEntity ingredient : missingIngredients) {
+            content.addView(createMissingIngredientRow(ingredient));
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Thiếu nguyên liệu")
+                .setView(content)
+                .setPositiveButton("Thêm vào danh sách đi chợ", (dialog, which) -> {
+                    int added = preparationRepository.addMissingIngredientsToShoppingList(planId);
+                    statusText.setText("Đã thêm " + added + " nguyên liệu cần mua vào danh sách đi chợ.");
+                    startActivity(new Intent(this, ShoppingListActivity.class));
+                })
+                .setNegativeButton("Bỏ qua", null)
+                .show();
+    }
+
+    private TextView createMissingIngredientRow(CookingPlanIngredientEntity ingredient) {
+        TextView row = new TextView(this);
+        row.setText(displayName(ingredient) + " - " + displayAmount(ingredient));
+        row.setTextColor(Color.parseColor("#2E150B"));
+        row.setTextSize(16);
+        row.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(14), dp(10), dp(14), dp(10));
+        row.setBackground(createMissingIngredientBackground());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, dp(10), 0, 0);
+        row.setLayoutParams(params);
+        return row;
+    }
+
+    private String displayName(CookingPlanIngredientEntity ingredient) {
+        IngredientEntity entity = preparationRepository.getIngredient(ingredient.ingredientId);
+        if (entity != null && entity.name != null && !entity.name.trim().isEmpty()) {
+            return entity.name.trim();
+        }
+        return ingredient.ingredientId;
+    }
+
+    private String displayAmount(CookingPlanIngredientEntity ingredient) {
+        if (preparationRepository.isPresenceOnly(ingredient)) {
+            return "chỉ cần có";
+        }
+        if (Math.abs(ingredient.missingAmount - Math.round(ingredient.missingAmount)) < 0.0001d) {
+            return Math.round(ingredient.missingAmount) + " " + ingredient.baseUnit;
+        }
+        return String.format(Locale.US, "%.1f %s", ingredient.missingAmount, ingredient.baseUnit);
+    }
+
+    private GradientDrawable createMissingIngredientBackground() {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(Color.parseColor("#FFF1EC"));
+        drawable.setCornerRadius(dp(12));
+        drawable.setStroke(dp(1), Color.parseColor("#DCC1B1"));
+        return drawable;
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
 
     private GradientDrawable createHeroBackground(int baseColor) {
         int light = Color.rgb(
