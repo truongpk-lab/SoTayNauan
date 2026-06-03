@@ -23,6 +23,10 @@ public class CookingModeViewModel {
         return cookingRepository.completeCurrentStep();
     }
 
+    public CookingSessionState finishCurrentRecipe() {
+        return cookingRepository.finishCurrentRecipe();
+    }
+
     public CookingSessionState goToPreviousStep() {
         return cookingRepository.goToPreviousStep();
     }
@@ -33,6 +37,18 @@ public class CookingModeViewModel {
 
     public CookingTimerState getTimerState() {
         return cookingRepository.getTimerState();
+    }
+
+    public CookingTimerState prepareTimer(long fallbackRecipeId) {
+        return cookingRepository.prepareCurrentStepTimer(fallbackRecipeId);
+    }
+
+    public CookingTimerState pauseTimer() {
+        return cookingRepository.pauseTimer();
+    }
+
+    public CookingTimerState resumeTimer() {
+        return cookingRepository.resumeTimer();
     }
 
     public void saveFinishedPhoto(long recipeId, String photoUri) {

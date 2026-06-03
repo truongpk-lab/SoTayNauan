@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.MediaStore;
 import android.view.View;
 import android.widget.Button;
@@ -31,6 +33,7 @@ import com.sotaynauan.ai.data.repository.RecipeRepository;
 import com.sotaynauan.ai.data.repository.ShoppingRepository;
 import com.sotaynauan.ai.data.seed.SeedDataProvider;
 import com.sotaynauan.ai.service.voice.VoiceSpeaker;
+import com.sotaynauan.ai.ui.home.HomeActivity;
 import com.sotaynauan.ai.ui.voice.VoiceAssistantActivity;
 import com.sotaynauan.ai.util.RecipeImageResolver;
 
@@ -41,6 +44,15 @@ import java.io.FileOutputStream;
 public class CookingModeActivity extends Activity {
     public static final String EXTRA_RECIPE_ID = "extra_recipe_id";
     private static final int REQUEST_FINISHED_PHOTO = 84;
+
+    private final Handler timerHandler = new Handler(Looper.getMainLooper());
+    private final Runnable timerTicker = new Runnable() {
+        @Override
+        public void run() {
+            refreshTimerFromRepository();
+            timerHandler.postDelayed(this, 1000L);
+        }
+    };
 
     private CookingModeViewModel viewModel;
     private CookingStepProgressAdapter stepProgressAdapter;
@@ -55,6 +67,7 @@ public class CookingModeActivity extends Activity {
     private Button completeStepButton;
     private Button captureFinishedPhotoButton;
     private Button saveFinishedNoteButton;
+    private Button finishCookingButton;
     private LinearLayout stepsContainer;
     private LinearLayout finishedJournal;
     private FrameLayout photoFrame;
@@ -117,12 +130,20 @@ public class CookingModeActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        refreshTimerFromRepository();
+        timerHandler.removeCallbacks(timerTicker);
+        timerHandler.post(timerTicker);
+    }
+
+    @Override
+    protected void onPause() {
+        timerHandler.removeCallbacks(timerTicker);
+        super.onPause();
     }
 
     @Override
     protected void onDestroy() {
         timerRunning = false;
+        timerHandler.removeCallbacks(timerTicker);
         if (voiceSpeaker != null) {
             voiceSpeaker.shutdown();
         }
@@ -153,6 +174,7 @@ public class CookingModeActivity extends Activity {
         completeStepButton = findViewById(R.id.cookingCompleteStepButton);
         captureFinishedPhotoButton = findViewById(R.id.cookingCaptureFinishedPhotoButton);
         saveFinishedNoteButton = findViewById(R.id.cookingSaveFinishedNoteButton);
+        finishCookingButton = findViewById(R.id.cookingFinishCookingButton);
         stepsContainer = findViewById(R.id.cookingStepsContainer);
         finishedJournal = findViewById(R.id.cookingFinishedJournal);
         photoFrame = findViewById(R.id.cookingPhotoFrame);
@@ -173,11 +195,12 @@ public class CookingModeActivity extends Activity {
         findViewById(R.id.cookingReplayTopButton).setOnClickListener(replayListener);
         findViewById(R.id.cookingAskAiButton).setOnClickListener(view -> openVoiceAssistant());
         findViewById(R.id.cookingAskTopButton).setOnClickListener(view -> openVoiceAssistant());
-        playPauseButton.setOnClickListener(view -> openTimer());
+        playPauseButton.setOnClickListener(view -> toggleInlineTimer());
         previousStepButton.setOnClickListener(view -> bindSession(viewModel.goToPreviousStep()));
         completeStepButton.setOnClickListener(view -> bindSession(viewModel.completeCurrentStep()));
         captureFinishedPhotoButton.setOnClickListener(view -> captureFinishedPhoto());
         saveFinishedNoteButton.setOnClickListener(view -> saveFinishedNote());
+        finishCookingButton.setOnClickListener(view -> finishCookingAndReturnHome());
     }
 
     private void bindSession(CookingSessionState state) {
@@ -187,6 +210,9 @@ public class CookingModeActivity extends Activity {
         remainingSeconds = stepTotalSeconds;
         playPauseButton.setText("▶");
         bindSessionKeepTimer(state);
+        if (state.hasRecipe() && !state.isCompleted()) {
+            bindTimerState(viewModel.prepareTimer(activeRecipeId));
+        }
     }
 
     private void bindSessionKeepTimer(CookingSessionState state) {
@@ -198,6 +224,7 @@ public class CookingModeActivity extends Activity {
             stepBadge.setText("Bước 0 / 0");
             previousStepButton.setEnabled(false);
             completeStepButton.setEnabled(false);
+            completeStepButton.setVisibility(View.VISIBLE);
             playPauseButton.setEnabled(false);
             stepPhoto.setImageResource(R.drawable.cooking_step_preview);
             finishedJournal.setVisibility(View.GONE);
@@ -217,7 +244,10 @@ public class CookingModeActivity extends Activity {
         previousStepButton.setText("←  Quay lại");
         previousStepButton.setEnabled(!state.isCompleted() && state.getCurrentStepIndex() > 0);
         previousStepButton.setAlpha(previousStepButton.isEnabled() ? 1f : 0.55f);
-        completeStepButton.setText(state.isCompleted() ? "Đã xong" : "Hoàn thành  →");
+        boolean isLastActiveStep = !state.isCompleted()
+                && state.getCurrentStepIndex() >= state.getStepCount() - 1;
+        completeStepButton.setText(isLastActiveStep ? "Xong bước cuối" : "Bước tiếp theo  →");
+        completeStepButton.setVisibility(state.isCompleted() ? View.GONE : View.VISIBLE);
         completeStepButton.setEnabled(!state.isCompleted() && !recipe.getSteps().isEmpty());
         completeStepButton.setAlpha(completeStepButton.isEnabled() ? 1f : 0.55f);
         playPauseButton.setEnabled(!state.isCompleted() && stepTotalSeconds > 0);
@@ -241,6 +271,7 @@ public class CookingModeActivity extends Activity {
             finishedPhoto.setImageURI(Uri.parse(photoUri));
         }
         finishedNote.setText(viewModel.getFinishedNote(recipeId));
+        finishCookingButton.setEnabled(true);
     }
 
     private void updateTimerViews() {
@@ -250,6 +281,17 @@ public class CookingModeActivity extends Activity {
         timerText.setText(String.format(Locale.US, "%02d:%02d", minutes, seconds));
         float progress = stepTotalSeconds <= 0 ? 0f : safeRemaining / (float) stepTotalSeconds;
         timerRing.setProgress(progress);
+    }
+
+    private void bindTimerState(CookingTimerState timerState) {
+        timerRunning = timerState.isRunning();
+        stepTotalSeconds = timerState.getTotalSeconds();
+        remainingSeconds = timerState.getRemainingSeconds();
+        playPauseButton.setText(timerRunning ? "Ⅱ" : "▶");
+        playPauseButton.setEnabled(currentState != null && !currentState.isCompleted()
+                && timerState.getTotalSeconds() > 0);
+        statusText.setText(timerState.getAssistantMessage());
+        updateTimerViews();
     }
 
     private void refreshTimerFromRepository() {
@@ -263,17 +305,7 @@ public class CookingModeActivity extends Activity {
                 || timerState.getStepIndex() != currentState.getCurrentStepIndex()) {
             return;
         }
-        timerRunning = timerState.isRunning();
-        stepTotalSeconds = timerState.getTotalSeconds();
-        remainingSeconds = timerState.getRemainingSeconds();
-        playPauseButton.setText(timerRunning ? "Ⅱ" : "▶");
-        statusText.setText(timerState.getAssistantMessage());
-        updateTimerViews();
-        if (timerState.isExpired() && !timerState.isAlarmAcknowledged()) {
-            Intent intent = new Intent(this, CookingTimerDoneActivity.class);
-            intent.putExtra(CookingTimerDoneActivity.EXTRA_RECIPE_ID, timerState.getRecipeId());
-            startActivity(intent);
-        }
+        bindTimerState(timerState);
     }
 
     private String createStepTitle(String stepText) {
@@ -301,14 +333,12 @@ public class CookingModeActivity extends Activity {
         startActivity(intent);
     }
 
-    private void openTimer() {
+    private void toggleInlineTimer() {
         if (currentState == null || currentState.isCompleted() || stepTotalSeconds <= 0) {
             return;
         }
-        Intent intent = new Intent(this, CookingTimerActivity.class);
-        long recipeId = currentState.hasRecipe() ? currentState.getRecipe().getId() : activeRecipeId;
-        intent.putExtra(CookingTimerActivity.EXTRA_RECIPE_ID, recipeId);
-        startActivity(intent);
+        CookingTimerState timerState = viewModel.getTimerState();
+        bindTimerState(timerState.isRunning() ? viewModel.pauseTimer() : viewModel.resumeTimer());
     }
 
     private void captureFinishedPhoto() {
@@ -328,6 +358,28 @@ public class CookingModeActivity extends Activity {
                 finishedNote.getText().toString().trim());
         statusText.setText("Đã lưu ghi chú sau khi nấu cho món "
                 + currentState.getRecipe().getName() + ".");
+    }
+
+    private void finishCookingAndReturnHome() {
+        if (currentState == null || !currentState.hasRecipe() || !currentState.isCompleted()) {
+            return;
+        }
+        String note = finishedNote.getText().toString().trim();
+        if (!note.isEmpty()) {
+            viewModel.saveFinishedNote(currentState.getRecipe().getId(), note);
+        }
+        finishCookingButton.setEnabled(false);
+        try {
+            CookingSessionState finishedState = viewModel.finishCurrentRecipe();
+            statusText.setText(finishedState.getStatusMessage());
+            Intent intent = new Intent(this, HomeActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
+            finish();
+        } catch (Exception exception) {
+            finishCookingButton.setEnabled(true);
+            statusText.setText("Không thể hoàn thành món: " + exception.getMessage());
+        }
     }
 
     private String saveFinishedPhoto(Bitmap bitmap) {

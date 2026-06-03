@@ -315,6 +315,18 @@
                     android:textSize="15sp"
                     android:textStyle="bold" />
             </LinearLayout>
+
+            <Button
+                android:id="@+id/cookingFinishCookingButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_cooking_ai_button"
+                android:text="Hoàn thành"
+                android:textAllCaps="false"
+                android:textColor="@color/on_primary_container"
+                android:textSize="17sp"
+                android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

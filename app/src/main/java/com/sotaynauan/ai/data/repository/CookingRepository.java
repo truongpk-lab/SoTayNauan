@@ -71,7 +71,9 @@ public class CookingRepository {
         }
         if (localDataSource.isCompleted()) {
             return createState(recipe, safeStepIndex(recipe, localDataSource.getCurrentStepIndex()),
-                    true, "Món này đã hoàn thành, tồn bếp đã được cập nhật trước đó.");
+                    true, localDataSource.isCookingFinished()
+                            ? "Món này đã hoàn thành, kho nguyên liệu đã được cập nhật trước đó."
+                            : "Bạn đã hoàn thành tất cả các bước. Bạn có thể bấm Hoàn thành khi sẵn sàng.");
         }
         int currentIndex = safeStepIndex(recipe, localDataSource.getCurrentStepIndex());
         int nextIndex = currentIndex + 1;
@@ -79,27 +81,39 @@ public class CookingRepository {
         if (completed) {
             nextIndex = Math.max(0, recipe.getSteps().size() - 1);
         }
-        String inventoryMessage = "";
-        if (completed && cookingPreparationRepository != null
-                && localDataSource.getActivePlanId() != null
-                && !localDataSource.getActivePlanId().trim().isEmpty()) {
-            try {
-                cookingPreparationRepository.completeCooking(localDataSource.getActivePlanId());
-                inventoryMessage = " Kho nguyên liệu đã được trừ bằng Room transaction.";
-            } catch (Exception exception) {
-                return createState(recipe, currentIndex, false,
-                        "Không thể hoàn tất nấu vì kho chưa hợp lệ: " + exception.getMessage());
-            }
-        } else if (completed && shoppingRepository != null) {
-            inventoryMessage = " " + shoppingRepository
-                    .consumeIngredientsForCookedRecipe(recipe.getIngredients(), recipe.getName())
-                    .getStatusMessage();
-        }
         localDataSource.updateStep(nextIndex, completed);
         return createState(recipe, nextIndex, completed,
                 completed
-                        ? "Bạn đã hoàn thành tất cả các bước." + inventoryMessage
+                        ? "Bạn đã hoàn thành tất cả các bước. Bạn có thể lưu ghi chú hoặc chụp ảnh trước khi hoàn thành món."
                         : "Đã chuyển sang bước " + (nextIndex + 1) + ".");
+    }
+
+    public CookingSessionState finishCurrentRecipe() {
+        Recipe recipe = recipeRepository.findRecipe(localDataSource.getActiveRecipeId());
+        if (recipe == null) {
+            throw new IllegalStateException("Không tìm thấy công thức đang nấu.");
+        }
+        if (!localDataSource.isCompleted()) {
+            throw new IllegalStateException("Bạn cần hoàn tất bước cuối cùng trước.");
+        }
+        if (localDataSource.isCookingFinished()) {
+            return createState(recipe, safeStepIndex(recipe, localDataSource.getCurrentStepIndex()),
+                    true, "Món đã hoàn thành, kho nguyên liệu đã được cập nhật trước đó.");
+        }
+        String inventoryMessage = "";
+        if (cookingPreparationRepository != null
+                && localDataSource.getActivePlanId() != null
+                && !localDataSource.getActivePlanId().trim().isEmpty()) {
+            cookingPreparationRepository.completeCooking(localDataSource.getActivePlanId());
+            inventoryMessage = "Kho nguyên liệu đã được trừ.";
+        } else if (shoppingRepository != null) {
+            inventoryMessage = shoppingRepository
+                    .consumeIngredientsForCookedRecipe(recipe.getIngredients(), recipe.getName())
+                    .getStatusMessage();
+        }
+        localDataSource.markCookingFinished(recipe.getId());
+        return createState(recipe, safeStepIndex(recipe, localDataSource.getCurrentStepIndex()),
+                true, inventoryMessage);
     }
 
     public CookingSessionState goToPreviousStep() {

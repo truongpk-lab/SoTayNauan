@@ -10,6 +10,7 @@ public class CookingLocalDataSource {
     private static final String KEY_STEP_INDEX = "step_index";
     private static final String KEY_UPDATED_AT = "updated_at";
     private static final String KEY_COMPLETED = "completed";
+    private static final String KEY_FINISHED = "finished";
     private static final String KEY_TIMER_RECIPE_ID = "timer_recipe_id";
     private static final String KEY_TIMER_STEP_INDEX = "timer_step_index";
     private static final String KEY_TIMER_TOTAL_SECONDS = "timer_total_seconds";
@@ -40,6 +41,7 @@ public class CookingLocalDataSource {
                 .putInt(KEY_STEP_INDEX, 0)
                 .putLong(KEY_UPDATED_AT, System.currentTimeMillis())
                 .putBoolean(KEY_COMPLETED, false)
+                .putBoolean(KEY_FINISHED, false)
                 .remove(KEY_TIMER_RECIPE_ID)
                 .remove(KEY_TIMER_STEP_INDEX)
                 .remove(KEY_TIMER_TOTAL_SECONDS)
@@ -51,12 +53,9 @@ public class CookingLocalDataSource {
     }
 
     public void updateStep(int stepIndex, boolean completed) {
-        boolean shouldIncrementCookedCount = completed && !isCompleted();
-        int nextCookedCount = getCookedCount() + (shouldIncrementCookedCount ? 1 : 0);
-        SharedPreferences.Editor editor = preferences.edit()
+        preferences.edit()
                 .putInt(KEY_STEP_INDEX, stepIndex)
                 .putBoolean(KEY_COMPLETED, completed)
-                .putInt(KEY_COOKED_COUNT, nextCookedCount)
                 .putLong(KEY_UPDATED_AT, System.currentTimeMillis())
                 .remove(KEY_TIMER_RECIPE_ID)
                 .remove(KEY_TIMER_STEP_INDEX)
@@ -64,13 +63,28 @@ public class CookingLocalDataSource {
                 .remove(KEY_TIMER_REMAINING_SECONDS)
                 .remove(KEY_TIMER_RUNNING)
                 .remove(KEY_TIMER_STARTED_AT)
-                .remove(KEY_TIMER_ALARM_ACKNOWLEDGED);
-        if (shouldIncrementCookedCount) {
-            editor.putString(KEY_COOKED_RECIPE_IDS, appendRecipeId(
-                    preferences.getString(KEY_COOKED_RECIPE_IDS, ""),
-                    getActiveRecipeId()));
+                .remove(KEY_TIMER_ALARM_ACKNOWLEDGED)
+                .apply();
+    }
+
+    public void markCookingFinished(long recipeId) {
+        java.util.List<Long> cookedRecipeIds = getCookedRecipeIds();
+        boolean alreadyRecorded = false;
+        for (Long cookedRecipeId : cookedRecipeIds) {
+            if (cookedRecipeId == recipeId) {
+                alreadyRecorded = true;
+                break;
+            }
         }
-        editor.apply();
+        preferences.edit()
+                .putBoolean(KEY_COMPLETED, true)
+                .putBoolean(KEY_FINISHED, true)
+                .putInt(KEY_COOKED_COUNT, getCookedCount() + (alreadyRecorded ? 0 : 1))
+                .putString(KEY_COOKED_RECIPE_IDS, appendRecipeId(
+                        preferences.getString(KEY_COOKED_RECIPE_IDS, ""),
+                        recipeId))
+                .putLong(KEY_UPDATED_AT, System.currentTimeMillis())
+                .apply();
     }
 
     public void saveTimer(long recipeId, int stepIndex, int totalSeconds, int remainingSeconds,
@@ -155,6 +169,10 @@ public class CookingLocalDataSource {
 
     public boolean isCompleted() {
         return preferences.getBoolean(KEY_COMPLETED, false);
+    }
+
+    public boolean isCookingFinished() {
+        return preferences.getBoolean(KEY_FINISHED, false);
     }
 
     public long getUpdatedAt() {
