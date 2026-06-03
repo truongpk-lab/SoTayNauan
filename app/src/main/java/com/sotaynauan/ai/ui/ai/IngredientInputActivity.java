@@ -4,11 +4,15 @@ import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.Gravity;
 import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
@@ -31,10 +35,23 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.text.Normalizer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 public class IngredientInputActivity extends Activity {
     private static final int REQUEST_CAPTURE_INGREDIENTS = 42;
+    private static final int COLOR_TEXT = Color.parseColor("#2E150B");
+    private static final int COLOR_MUTED = Color.parseColor("#564337");
+    private static final int COLOR_PRIMARY = Color.parseColor("#944A00");
+    private static final int COLOR_OUTLINE = Color.parseColor("#DCC1B1");
+    private static final int COLOR_PANEL = Color.parseColor("#FFFFFF");
+    private static final int COLOR_SOFT = Color.parseColor("#FFF1EC");
+    private static final int COLOR_SELECTED = Color.parseColor("#FFE084");
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private IngredientInputViewModel viewModel;
@@ -42,11 +59,19 @@ public class IngredientInputActivity extends Activity {
     private IngredientChipAdapter adapter;
     private EditText input;
     private GridLayout basketContainer;
+    private GridLayout ingredientChoiceGrid;
+    private GridLayout categoryIngredientGrid;
+    private LinearLayout quickPackContainer;
+    private LinearLayout categoryTabs;
     private TextView countText;
     private TextView statusText;
     private TextView emptyText;
+    private TextView searchResultLabel;
     private Button ctaButton;
     private boolean detectingIngredients;
+    private int activeCategoryIndex;
+    private List<IngredientCategory> ingredientCategories;
+    private List<QuickPack> quickPacks;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,12 +83,19 @@ public class IngredientInputActivity extends Activity {
                         null, null, AppDatabase.getInstance(this)));
         aiBackendRemoteDataSource = new AiBackendRemoteDataSource(BuildConfig.AI_BACKEND_BASE_URL);
         adapter = new IngredientChipAdapter(this);
+        ingredientCategories = createIngredientCategories();
+        quickPacks = createQuickPacks();
 
         input = findViewById(R.id.ingredientInput);
         basketContainer = findViewById(R.id.ingredientBasket);
+        ingredientChoiceGrid = findViewById(R.id.ingredientChoiceGrid);
+        categoryIngredientGrid = findViewById(R.id.categoryIngredientGrid);
+        quickPackContainer = findViewById(R.id.quickPackContainer);
+        categoryTabs = findViewById(R.id.categoryTabs);
         countText = findViewById(R.id.ingredientCount);
         statusText = findViewById(R.id.ingredientStatus);
         emptyText = findViewById(R.id.emptyIngredientState);
+        searchResultLabel = findViewById(R.id.searchResultLabel);
         ctaButton = findViewById(R.id.findRecipesButton);
 
         findViewById(R.id.backButton).setOnClickListener(view -> finish());
@@ -83,7 +115,9 @@ public class IngredientInputActivity extends Activity {
 
             @Override
             public void onTextChanged(CharSequence value, int start, int before, int count) {
-                updateCtaState(viewModel.loadState());
+                IngredientInputState state = viewModel.loadState();
+                bindIngredientPickers(state);
+                updateCtaState(state);
             }
 
             @Override
@@ -95,8 +129,8 @@ public class IngredientInputActivity extends Activity {
                 openCameraForIngredientDetection());
         ctaButton.setOnClickListener(view -> continueToSuggestions());
 
-        adapter.bindSuggestions(findViewById(R.id.suggestionChips),
-                viewModel.loadSuggestions(), ingredient -> bindState(viewModel.addIngredient(ingredient)));
+        bindQuickPacks();
+        bindCategoryTabs();
         bindState(viewModel.loadState());
     }
 
@@ -243,6 +277,14 @@ public class IngredientInputActivity extends Activity {
         return state;
     }
 
+    private void addIngredientList(List<String> ingredients) {
+        IngredientInputState state = viewModel.loadState();
+        for (String ingredient : ingredients) {
+            state = viewModel.addIngredient(ingredient);
+        }
+        bindState(state);
+    }
+
     private void continueToSuggestions() {
         IngredientInputState state = input.getText().toString().trim().isEmpty()
                 ? viewModel.loadState()
@@ -261,6 +303,7 @@ public class IngredientInputActivity extends Activity {
                 ingredient -> bindState(viewModel.removeIngredient(ingredient)));
         countText.setText(state.getCount() + " món");
         emptyText.setVisibility(state.getCount() == 0 ? TextView.VISIBLE : TextView.GONE);
+        bindIngredientPickers(state);
         updateCtaState(state);
         statusText.setText(state.getLastAction());
     }
@@ -270,5 +313,242 @@ public class IngredientInputActivity extends Activity {
         boolean canSuggest = state.getCount() > 0 || hasTypedIngredient;
         ctaButton.setEnabled(canSuggest);
         ctaButton.setAlpha(canSuggest ? 1f : 0.55f);
+    }
+
+    private void bindIngredientPickers(IngredientInputState state) {
+        String query = input.getText().toString().trim();
+        List<String> searchChoices = query.isEmpty()
+                ? smartSuggestions(state.getIngredients())
+                : searchIngredients(query);
+        if (!query.isEmpty() && searchChoices.isEmpty()) {
+            searchChoices.add(query);
+        }
+        searchResultLabel.setText(query.isEmpty()
+                ? "Gợi ý phù hợp"
+                : "Kết quả cho \"" + query + "\"");
+        bindChoiceGrid(ingredientChoiceGrid, searchChoices, state.getIngredients(), 2);
+
+        if (activeCategoryIndex < 0 || activeCategoryIndex >= ingredientCategories.size()) {
+            activeCategoryIndex = 0;
+        }
+        bindChoiceGrid(categoryIngredientGrid,
+                ingredientCategories.get(activeCategoryIndex).ingredients,
+                state.getIngredients(), 2);
+    }
+
+    private void bindQuickPacks() {
+        quickPackContainer.removeAllViews();
+        for (QuickPack pack : quickPacks) {
+            TextView chip = new TextView(this);
+            chip.setText(pack.title + "\n" + pack.subtitle);
+            chip.setTextColor(COLOR_TEXT);
+            chip.setTextSize(14);
+            chip.setTypeface(Typeface.DEFAULT_BOLD);
+            chip.setGravity(Gravity.CENTER_VERTICAL);
+            chip.setMinHeight(dp(58));
+            chip.setPadding(dp(16), 0, dp(16), 0);
+            chip.setBackground(round(COLOR_PANEL, dp(8), COLOR_OUTLINE, dp(1)));
+            chip.setOnClickListener(view -> addIngredientList(pack.ingredients));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(150), dp(58));
+            params.setMargins(0, 0, dp(10), 0);
+            quickPackContainer.addView(chip, params);
+        }
+    }
+
+    private void bindCategoryTabs() {
+        categoryTabs.removeAllViews();
+        for (int index = 0; index < ingredientCategories.size(); index++) {
+            IngredientCategory category = ingredientCategories.get(index);
+            TextView tab = new TextView(this);
+            tab.setText(category.title);
+            tab.setTextSize(14);
+            tab.setTypeface(Typeface.DEFAULT_BOLD);
+            tab.setGravity(Gravity.CENTER);
+            tab.setMinHeight(dp(38));
+            tab.setPadding(dp(15), 0, dp(15), 0);
+            boolean selected = index == activeCategoryIndex;
+            tab.setTextColor(selected ? Color.WHITE : COLOR_MUTED);
+            tab.setBackground(round(selected ? COLOR_PRIMARY : Color.TRANSPARENT,
+                    dp(19), COLOR_OUTLINE, dp(1)));
+            int tabIndex = index;
+            tab.setOnClickListener(view -> {
+                activeCategoryIndex = tabIndex;
+                bindCategoryTabs();
+                bindIngredientPickers(viewModel.loadState());
+            });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, dp(38));
+            params.setMargins(0, 0, dp(8), 0);
+            categoryTabs.addView(tab, params);
+        }
+    }
+
+    private void bindChoiceGrid(GridLayout grid, List<String> choices, List<String> selectedIngredients,
+                                int columns) {
+        grid.removeAllViews();
+        grid.setColumnCount(columns);
+        Set<String> selectedKeys = ingredientKeySet(selectedIngredients);
+        for (String choice : choices) {
+            boolean selected = selectedKeys.contains(ingredientKey(choice));
+            TextView chip = new TextView(this);
+            chip.setText((selected ? "✓ " : "+ ") + choice);
+            chip.setTextColor(selected ? COLOR_TEXT : COLOR_MUTED);
+            chip.setTextSize(15);
+            chip.setTypeface(Typeface.DEFAULT_BOLD);
+            chip.setGravity(Gravity.CENTER);
+            chip.setSingleLine(false);
+            chip.setPadding(dp(10), 0, dp(10), 0);
+            chip.setBackground(round(selected ? COLOR_SELECTED : COLOR_SOFT,
+                    dp(8), selected ? 0 : COLOR_OUTLINE, selected ? 0 : dp(1)));
+            chip.setOnClickListener(view -> bindState(selected
+                    ? viewModel.removeIngredient(choice)
+                    : viewModel.addIngredient(choice)));
+
+            GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+            params.width = 0;
+            params.height = dp(42);
+            params.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f);
+            params.setMargins(0, 0, dp(9), dp(9));
+            grid.addView(chip, params);
+        }
+    }
+
+    private List<String> smartSuggestions(List<String> selectedIngredients) {
+        Set<String> selected = ingredientKeySet(selectedIngredients);
+        List<String> choices = new ArrayList<>();
+        addChoices(choices, selected, viewModel.loadSuggestions());
+        addChoices(choices, selected, Arrays.asList("Trứng gà", "Cà chua", "Thịt gà", "Đậu hũ"));
+        for (IngredientCategory category : ingredientCategories) {
+            addChoices(choices, selected, category.ingredients);
+            if (choices.size() >= 8) {
+                break;
+            }
+        }
+        return choices.size() > 8 ? new ArrayList<>(choices.subList(0, 8)) : choices;
+    }
+
+    private void addChoices(List<String> choices, Set<String> selected, List<String> candidates) {
+        Set<String> existing = ingredientKeySet(choices);
+        for (String candidate : candidates) {
+            String key = ingredientKey(candidate);
+            if (!key.isEmpty() && !selected.contains(key) && !existing.contains(key)) {
+                choices.add(candidate);
+                existing.add(key);
+            }
+        }
+    }
+
+    private List<String> searchIngredients(String query) {
+        String queryKey = ingredientKey(query);
+        List<String> results = new ArrayList<>();
+        Set<String> existing = new HashSet<>();
+        for (IngredientCategory category : ingredientCategories) {
+            for (String ingredient : category.ingredients) {
+                String key = ingredientKey(ingredient);
+                if (key.contains(queryKey) && !existing.contains(key)) {
+                    results.add(ingredient);
+                    existing.add(key);
+                }
+                if (results.size() >= 8) {
+                    return results;
+                }
+            }
+        }
+        return results;
+    }
+
+    private Set<String> ingredientKeySet(List<String> ingredients) {
+        Set<String> keys = new HashSet<>();
+        for (String ingredient : ingredients) {
+            String key = ingredientKey(ingredient);
+            if (!key.isEmpty()) {
+                keys.add(key);
+            }
+        }
+        return keys;
+    }
+
+    private String ingredientKey(String value) {
+        if (value == null) {
+            return "";
+        }
+        String normalized = Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
+                .replace('đ', 'd')
+                .replace('Đ', 'D')
+                .toLowerCase(Locale.US)
+                .trim()
+                .replaceAll("[^a-z0-9]+", " ");
+        return normalized.replaceAll("\\s+", " ").trim();
+    }
+
+    private List<IngredientCategory> createIngredientCategories() {
+        List<IngredientCategory> categories = new ArrayList<>();
+        categories.add(new IngredientCategory("Hay dùng", Arrays.asList(
+                "Tỏi", "Hành tím", "Hành tây", "Nước mắm", "Đường", "Muối",
+                "Tiêu", "Dầu ăn", "Ớt", "Gừng")));
+        categories.add(new IngredientCategory("Đạm", Arrays.asList(
+                "Trứng gà", "Thịt gà", "Thịt heo", "Thịt bò", "Cá", "Tôm",
+                "Mực", "Đậu hũ", "Chả cá", "Sườn non")));
+        categories.add(new IngredientCategory("Rau củ", Arrays.asList(
+                "Cà chua", "Rau muống", "Cải xanh", "Bắp cải", "Cà rốt",
+                "Khoai tây", "Dưa leo", "Bí đỏ", "Nấm", "Hành lá")));
+        categories.add(new IngredientCategory("Tinh bột", Arrays.asList(
+                "Gạo", "Cơm nguội", "Bún", "Mì", "Phở", "Bánh mì", "Miến",
+                "Bột mì", "Bột gạo", "Khoai lang")));
+        categories.add(new IngredientCategory("Gia vị", Arrays.asList(
+                "Dầu hào", "Nước tương", "Tương ớt", "Sa tế", "Bột ngọt",
+                "Hạt nêm", "Mật ong", "Giấm", "Chanh", "Sả")));
+        return categories;
+    }
+
+    private List<QuickPack> createQuickPacks() {
+        List<QuickPack> packs = new ArrayList<>();
+        packs.add(new QuickPack("Bữa cơm nhà", "8 món hay có", Arrays.asList(
+                "Gạo", "Trứng gà", "Thịt heo", "Cà chua", "Rau muống",
+                "Tỏi", "Nước mắm", "Hành lá")));
+        packs.add(new QuickPack("Nấu nhanh", "15 phút", Arrays.asList(
+                "Trứng gà", "Cà chua", "Hành lá", "Tỏi", "Dầu ăn", "Nước mắm")));
+        packs.add(new QuickPack("Tủ lạnh hôm nay", "rau + đạm", Arrays.asList(
+                "Thịt gà", "Cà rốt", "Khoai tây", "Hành tây", "Nấm", "Tiêu")));
+        packs.add(new QuickPack("Món nước", "bún/phở/mì", Arrays.asList(
+                "Bún", "Thịt bò", "Hành tây", "Hành lá", "Gừng", "Nước mắm")));
+        return packs;
+    }
+
+    private GradientDrawable round(int color, int radius, int strokeColor, int strokeWidth) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(radius);
+        if (strokeColor != 0 && strokeWidth > 0) {
+            drawable.setStroke(strokeWidth, strokeColor);
+        }
+        return drawable;
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private static class IngredientCategory {
+        final String title;
+        final List<String> ingredients;
+
+        IngredientCategory(String title, List<String> ingredients) {
+            this.title = title;
+            this.ingredients = ingredients;
+        }
+    }
+
+    private static class QuickPack {
+        final String title;
+        final String subtitle;
+        final List<String> ingredients;
+
+        QuickPack(String title, String subtitle, List<String> ingredients) {
+            this.title = title;
+            this.subtitle = subtitle;
+            this.ingredients = ingredients;
+        }
     }
 }

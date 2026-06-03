@@ -8,20 +8,20 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"
-        android:paddingBottom="112dp">
+        android:paddingBottom="104dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingStart="20dp"
+            android:paddingStart="18dp"
             android:paddingTop="8dp"
-            android:paddingEnd="20dp"
+            android:paddingEnd="18dp"
             android:paddingBottom="28dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="52dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
@@ -42,7 +42,7 @@
                     android:gravity="center"
                     android:text="@string/ingredient_input_title"
                     android:textColor="@color/primary"
-                    android:textSize="23sp"
+                    android:textSize="22sp"
                     android:textStyle="bold" />
 
                 <Space
@@ -53,30 +53,30 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="22dp"
+                android:layout_marginTop="18dp"
                 android:text="@string/ingredient_input_question"
                 android:textColor="@color/on_surface"
-                android:textSize="32sp"
+                android:textSize="29sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:lineSpacingExtra="4dp"
+                android:lineSpacingExtra="3dp"
                 android:text="@string/ingredient_input_intro"
                 android:textColor="@color/on_surface_variant"
-                android:textSize="18sp" />
+                android:textSize="16sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="24dp"
-                android:background="@drawable/bg_auth_input"
+                android:layout_height="54dp"
+                android:layout_marginTop="18dp"
+                android:background="@drawable/bg_ingredient_search"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingStart="16dp"
-                android:paddingEnd="8dp">
+                android:paddingStart="14dp"
+                android:paddingEnd="7dp">
 
                 <TextView
                     android:layout_width="28dp"
@@ -84,13 +84,13 @@
                     android:gravity="center"
                     android:text="⌕"
                     android:textColor="@color/on_surface_variant"
-                    android:textSize="24sp" />
+                    android:textSize="22sp" />
 
                 <EditText
                     android:id="@+id/ingredientInput"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
-                    android:layout_marginStart="6dp"
+                    android:layout_marginStart="4dp"
                     android:layout_weight="1"
                     android:background="@android:color/transparent"
                     android:hint="@string/ingredient_input_hint"
@@ -99,61 +99,99 @@
                     android:singleLine="true"
                     android:textColor="@color/on_surface"
                     android:textColorHint="@color/on_surface_variant"
-                    android:textSize="16sp" />
+                    android:textSize="15sp" />
 
                 <Button
                     android:id="@+id/addIngredientButton"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
                     android:background="@drawable/bg_primary_button"
                     android:minWidth="0dp"
                     android:padding="0dp"
                     android:text="+"
                     android:textAllCaps="false"
                     android:textColor="@color/on_primary"
-                    android:textSize="24sp"
+                    android:textSize="23sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
             <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="14dp"
                 android:overScrollMode="never"
                 android:scrollbars="none">
 
                 <LinearLayout
+                    android:id="@+id/quickPackContainer"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="40dp"
-                        android:layout_marginEnd="10dp"
-                        android:gravity="center_vertical"
-                        android:text="@string/ingredient_suggestions_label"
-                        android:textColor="@color/on_surface_variant"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <LinearLayout
-                        android:id="@+id/suggestionChips"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal" />
-                </LinearLayout>
+                    android:orientation="horizontal" />
             </HorizontalScrollView>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:background="@drawable/bg_auth_card"
-                android:elevation="4dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_ingredient_panel"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/searchResultLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/ingredient_suggestions_label"
+                    android:textColor="@color/on_surface"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <GridLayout
+                    android:id="@+id/ingredientChoiceGrid"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:columnCount="2" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="Chọn theo khu vực bếp"
+                android:textColor="@color/on_surface"
+                android:textSize="19sp"
+                android:textStyle="bold" />
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:overScrollMode="never"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/categoryTabs"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+
+            <GridLayout
+                android:id="@+id/categoryIngredientGrid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:columnCount="2" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:background="@drawable/bg_ingredient_panel"
+                android:elevation="3dp"
+                android:orientation="vertical"
+                android:padding="16dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -167,13 +205,13 @@
                         android:layout_weight="1"
                         android:text="@string/ingredient_basket_title"
                         android:textColor="@color/on_surface"
-                        android:textSize="20sp"
+                        android:textSize="19sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/ingredientCount"
                         android:layout_width="wrap_content"
-                        android:layout_height="34dp"
+                        android:layout_height="32dp"
                         android:background="@drawable/bg_ai_badge"
                         android:gravity="center"
                         android:paddingStart="14dp"
@@ -187,42 +225,41 @@
                     android:id="@+id/ingredientBasket"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="14dp"
                     android:columnCount="2" />
 
                 <TextView
                     android:id="@+id/emptyIngredientState"
                     android:layout_width="match_parent"
-                    android:layout_height="96dp"
+                    android:layout_height="82dp"
                     android:gravity="center"
                     android:text="@string/ingredient_empty_state"
                     android:textColor="@color/on_surface_variant"
-                    android:textSize="16sp" />
+                    android:textSize="15sp" />
             </LinearLayout>
 
             <Button
                 android:id="@+id/cameraScanButton"
                 android:layout_width="match_parent"
-                android:layout_height="116dp"
-                android:layout_marginTop="20dp"
-                android:background="@drawable/bg_ai_cta"
+                android:layout_height="56dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_ingredient_camera"
                 android:gravity="center"
-                android:padding="18dp"
                 android:text="@string/ingredient_camera_scan"
                 android:textAllCaps="false"
-                android:textColor="@color/on_surface"
-                android:textSize="18sp"
+                android:textColor="@color/primary"
+                android:textSize="16sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/ingredientStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
+                android:layout_marginTop="14dp"
                 android:background="@drawable/bg_soft_panel"
-                android:padding="16dp"
+                android:padding="14dp"
                 android:textColor="@color/primary"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </ScrollView>
@@ -231,7 +268,7 @@
         android:layout_width="match_parent"
         android:layout_height="88dp"
         android:layout_gravity="bottom"
-        android:background="@color/background"
+        android:background="@drawable/bg_ingredient_bottom"
         android:elevation="12dp"
         android:gravity="center"
         android:paddingStart="16dp"
