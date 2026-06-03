@@ -4,6 +4,7 @@
 
 # Giữ README.md
 !README.md
+!HDCD.MD
 
 # Không push các tài liệu frontend phụ trợ
 READ_frontend/
@@ -16,6 +17,7 @@ backend/node_modules/
 backend/.env
 backend/yolo_detector/.venv/
 backend/yolo_detector/models/*/model.pt
+!backend/yolo_detector/models/original_yolov8s/model.pt
 __pycache__/
 *.pyc
 local.properties
