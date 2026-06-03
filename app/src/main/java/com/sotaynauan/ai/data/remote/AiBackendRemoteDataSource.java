@@ -1,5 +1,7 @@
 package com.sotaynauan.ai.data.remote;
 
+import com.sotaynauan.ai.data.model.ConfirmedIngredient;
+import com.sotaynauan.ai.data.model.DetectedIngredient;
 import com.sotaynauan.ai.data.model.RecipeMatch;
 
 import org.json.JSONArray;
@@ -77,6 +79,62 @@ public class AiBackendRemoteDataSource {
                 .put("contextLabel", contextLabel == null ? "" : contextLabel)
                 .put("localResponse", localResponse == null ? "" : localResponse);
         return postForText("/api/ai/voice", body);
+    }
+
+    public List<DetectedIngredient> detectIngredientsFromImage(byte[] imageBytes,
+                                                               String mimeType) throws IOException, JSONException {
+        if (imageBytes == null || imageBytes.length == 0) {
+            throw new IOException("Ảnh chụp rỗng.");
+        }
+        JSONObject body = new JSONObject()
+                .put("imageBase64", Base64.encodeToString(imageBytes, Base64.NO_WRAP))
+                .put("mimeType", mimeType == null || mimeType.trim().isEmpty()
+                        ? "image/jpeg"
+                        : mimeType);
+        JSONObject response = postForJson("/api/ai/ingredient-detection", body);
+        JSONArray rows = response.optJSONArray("ingredients");
+        List<DetectedIngredient> ingredients = new java.util.ArrayList<>();
+        if (rows == null) {
+            return ingredients;
+        }
+        for (int index = 0; index < rows.length(); index++) {
+            Object row = rows.opt(index);
+            DetectedIngredient ingredient = parseDetectedIngredient(row);
+            if (!ingredient.isEmpty()) {
+                ingredients.add(ingredient);
+            }
+        }
+        return ingredients;
+    }
+
+    private DetectedIngredient parseDetectedIngredient(Object row) {
+        if (row instanceof JSONObject) {
+            JSONObject object = (JSONObject) row;
+            String name = object.optString("name", "").trim();
+            String quantity = object.optString("quantity", "").trim();
+            int count = object.optInt("count", 0);
+            double confidence = object.optDouble("confidence", 0d);
+            String source = object.optString("source", ConfirmedIngredient.SOURCE_CAMERA);
+            JSONArray boxRows = object.optJSONArray("boxes");
+            List<DetectedIngredient.Box> boxes = new java.util.ArrayList<>();
+            if (boxRows != null) {
+                for (int index = 0; index < boxRows.length(); index++) {
+                    JSONObject box = boxRows.optJSONObject(index);
+                    if (box == null) {
+                        continue;
+                    }
+                    boxes.add(new DetectedIngredient.Box(
+                            box.optDouble("x1", 0d),
+                            box.optDouble("y1", 0d),
+                            box.optDouble("x2", 0d),
+                            box.optDouble("y2", 0d),
+                            box.optDouble("confidence", confidence)));
+                }
+            }
+            return new DetectedIngredient(name, quantity, count, confidence, source, boxes);
+        }
+        return new DetectedIngredient(String.valueOf(row == null ? "" : row).trim(),
+                "", 0, 0d, ConfirmedIngredient.SOURCE_CAMERA, new java.util.ArrayList<>());
     }
 
     public String matchVoiceCommand(String spokenText,

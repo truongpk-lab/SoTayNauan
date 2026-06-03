@@ -1,0 +1,14 @@
+{
+  "id": "original_yolov8s",
+  "displayName": "Original YOLOv8s",
+  "weightFile": "model.pt",
+  "baseArchitecture": "YOLOv8s",
+  "task": "object-detection",
+  "trainingStatus": "base-pretrained",
+  "intendedUse": "Local development baseline for ingredient detection before fine-tuning",
+  "limitations": [
+    "This is not yet fine-tuned on Vietnamese cooking ingredients.",
+    "Only COCO food labels and mapped labels can be recognized reliably.",
+    "Ingredient count is based on visible bounding boxes, not weight or volume."
+  ]
+}

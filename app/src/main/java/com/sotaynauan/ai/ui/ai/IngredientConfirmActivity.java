@@ -12,6 +12,7 @@ import android.widget.TextView;
 
 import com.sotaynauan.ai.R;
 import com.sotaynauan.ai.adapter.ai.IngredientConfirmAdapter;
+import com.sotaynauan.ai.data.local.database.AppDatabase;
 import com.sotaynauan.ai.data.local.datasource.AiChefLocalDataSource;
 import com.sotaynauan.ai.data.model.ConfirmedIngredient;
 import com.sotaynauan.ai.data.model.IngredientConfirmState;
@@ -31,7 +32,8 @@ public class IngredientConfirmActivity extends Activity {
         setContentView(R.layout.activity_ingredient_confirm);
 
         viewModel = new IngredientConfirmViewModel(
-                new AiChefRepository(new AiChefLocalDataSource(this)));
+                new AiChefRepository(new AiChefLocalDataSource(this),
+                        null, null, AppDatabase.getInstance(this)));
         adapter = new IngredientConfirmAdapter(this, new IngredientConfirmAdapter.Listener() {
             @Override
             public void onToggle(ConfirmedIngredient ingredient, boolean selected) {

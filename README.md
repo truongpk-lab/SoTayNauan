@@ -56,7 +56,7 @@ Trên Windows, mở terminal tại `D:\SoTayNauAn`, chạy:
 
 ```bat
 cd backend
-node server.js
+run_backend.bat
 ```
 
 Backend mặc định chạy ở:
@@ -65,19 +65,108 @@ Backend mặc định chạy ở:
 http://localhost:8787
 ```
 
-Emulator Android truy cập máy host qua:
+Nếu chạy trên điện thoại Android thật, app truy cập backend máy tính qua USB `adb reverse`. `run_app.bat` tự chạy:
 
 ```text
-http://10.0.2.2:8787
+adb reverse tcp:8787 tcp:8787
 ```
 
-Giá trị này nằm trong `local.properties`:
+Khi đó debug app gọi:
+
+```text
+AI_BACKEND_BASE_URL=http://127.0.0.1:8787
+```
+
+Nếu chạy trên emulator, debug app sẽ gọi:
 
 ```text
 AI_BACKEND_BASE_URL=http://10.0.2.2:8787
 ```
 
+`10.0.2.2` chỉ dành cho emulator. Muốn emulator dùng webcam máy tính thay vì cảnh ảo, cấu hình AVD Camera = `Webcam0`.
+
+Với bản release/production, không dùng HTTP cleartext. Cấu hình endpoint HTTPS riêng:
+
+```text
+AI_BACKEND_BASE_URL_RELEASE=https://your-ai-backend.example.com
+```
+
+Debug build có cấu hình network security riêng để cho phép HTTP local khi phát triển. Release build không bật cleartext.
+
 API key Gemini nằm ở `backend/.env`, không nhúng vào APK Android.
+
+### Chạy YOLO detector service
+
+Backend Node chỉ proxy nhận diện nguyên liệu sang YOLO khi có `YOLO_DETECT_URL`. Không cấu hình biến này thì app sẽ nhận lỗi rõ ràng thay vì fallback âm thầm.
+
+Tạo môi trường Python và chạy service:
+
+```bat
+cd backend\yolo_detector
+run_yolo_detector.bat
+```
+
+Hoặc chạy thủ công:
+
+```powershell
+cd backend\yolo_detector
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app:app --host 0.0.0.0 --port 8790
+```
+
+Nếu PowerShell chặn script activate, chạy một lần trong terminal hiện tại:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+Hoặc không cần activate, chạy trực tiếp:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app:app --host 0.0.0.0 --port 8790
+```
+
+Trong `backend\.env`:
+
+```text
+YOLO_DETECT_URL=http://127.0.0.1:8790/detect
+YOLO_TIMEOUT_MS=20000
+YOLO_MODEL_ID=original_yolov8s
+```
+
+Model mặc định đã được đặt theo registry tại:
+
+```text
+backend\yolo_detector\models\original_yolov8s\model.pt
+backend\yolo_detector\models\models.json
+```
+
+`original_yolov8s` dùng file weight `original_yolov8s.pt` đã đưa vào cấu trúc chuẩn. Khi muốn nâng cấp model, tạo thư mục mới trong `backend\yolo_detector\models\`, đặt `model.pt`, thêm metadata/entry vào `models.json`, rồi đổi `YOLO_MODEL_ID`.
+
+Khi deploy production, đặt YOLO service sau HTTPS và dùng:
+
+```text
+YOLO_DETECT_URL=https://your-yolo-detector.example.com/detect
+```
+
+Train custom model cho nguyên liệu:
+
+```bat
+cd backend\yolo_detector
+python train.py --data ingredients_v1.yaml --model yolo26s.pt --epochs 100 --imgsz 960
+```
+
+Dataset theo format YOLO đặt tại `datasets\ingredients_v1`, gồm `images\train`, `images\val`, `images\test` và thư mục `labels` tương ứng. Sau khi train xong, thêm model mới vào registry:
+
+```text
+backend\yolo_detector\models\ingredients_v1\model.pt
+backend\yolo_detector\models\ingredients_v1\metadata.json
+backend\yolo_detector\models\models.json
+YOLO_MODEL_ID=ingredients_v1
+```
 
 ### Một lệnh build, cài và mở app
 
@@ -100,25 +189,23 @@ PowerShell không tự chạy script trong thư mục hiện tại bằng tên t
 Lệnh này sẽ:
 
 ```text
-1. Build APK debug.
-2. Mở emulator Medium_Phone nếu chưa có thiết bị/emulator đang chạy.
-3. Chờ Android boot xong.
-4. Cài APK vào emulator hoặc thiết bị.
-5. Mở app Sổ Tay Nấu Ăn AI.
+1. Kiểm tra backend đang chạy ở 127.0.0.1:8787 và YOLO detector sẵn sàng qua `/health`.
+2. Ưu tiên thiết bị Android thật nếu có.
+3. Nếu không có thiết bị thật, tự mở emulator như cấu hình cũ.
+4. Tự chọn backend URL đúng: `127.0.0.1` cho thiết bị thật, `10.0.2.2` cho emulator.
+5. Build, cài APK và mở app.
 ```
 
 PATH Windows user đã được cấu hình thêm:
 
 ```text
 C:\Users\KingSpec Official\AppData\Local\Android\Sdk\platform-tools
-C:\Users\KingSpec Official\AppData\Local\Android\Sdk\emulator
 ```
 
 Sau khi mở terminal mới, có thể gọi trực tiếp:
 
 ```bat
 adb devices
-emulator -list-avds
 ```
 
 Nếu đang chạy từ WSL, dùng:
@@ -127,9 +214,11 @@ Nếu đang chạy từ WSL, dùng:
 cmd.exe /c run_app.bat
 ```
 
-Lưu ý: các terminal đã mở trước khi cấu hình PATH có thể chưa nhận `adb` và `emulator`. Hãy đóng terminal cũ và mở Command Prompt/PowerShell mới.
+Lưu ý: emulator mặc định có thể đang dùng Virtual Scene. Nếu muốn lấy hình từ webcam máy tính, mở Android Studio → Device Manager → Edit AVD → Show Advanced Settings → Camera → chọn `Webcam0`.
 
 ### Chạy bằng Android Studio
+
+Nếu chọn emulator và muốn quét bằng webcam máy tính, hãy cấu hình AVD Camera = `Webcam0` trước khi chạy.
 
 1. Mở Android Studio.
 2. Chọn `Open` và trỏ tới thư mục `D:\SoTayNauAn`.
@@ -152,6 +241,8 @@ D:\SoTayNauAn\app\build\outputs\apk\debug\app-debug.apk
 ```
 
 ### Cài APK vào emulator hoặc thiết bị
+
+Emulator dùng được cho luồng camera nếu AVD Camera được đặt là `Webcam0`. Nếu để mặc định `Virtual Scene`, màn quét sẽ vẫn là cảnh ảo.
 
 Đảm bảo emulator đang chạy hoặc thiết bị đã bật USB debugging, rồi chạy:
 
@@ -185,6 +276,8 @@ Sổ Tay Nấu Ăn AI
 
 ### Build, cài và mở trực tiếp trên emulator-5554
 
+Nếu muốn kiểm tra camera/YOLO trên emulator, hãy cấu hình AVD Camera = `Webcam0` trước khi chạy.
+
 Khi `emulator-5554` đã chạy sẵn, có thể dùng lần lượt:
 
 ```bat
@@ -208,5 +301,3 @@ Nếu chạy trong WSL mà gặp lỗi `JAVA_HOME is not set`, dùng lệnh ch�
 ```bash
 cmd.exe /c run_app.bat
 ```
-cd backend
-node server.js

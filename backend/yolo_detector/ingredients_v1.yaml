@@ -1,0 +1,35 @@
+path: ../../datasets/ingredients_v1
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: egg
+  1: tomato
+  2: green_onion
+  3: garlic
+  4: shallot
+  5: onion
+  6: chili
+  7: carrot
+  8: potato
+  9: water_spinach
+  10: mustard_green
+  11: cabbage
+  12: cucumber
+  13: pumpkin
+  14: mushroom
+  15: tofu
+  16: pork
+  17: beef
+  18: chicken
+  19: fish
+  20: shrimp
+  21: squid
+  22: rice_noodle
+  23: noodle
+  24: rice
+  25: cooked_rice
+  26: lime
+  27: ginger
+  28: lemongrass

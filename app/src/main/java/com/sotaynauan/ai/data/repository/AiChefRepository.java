@@ -10,6 +10,7 @@ import com.sotaynauan.ai.data.model.AiChefFeature;
 import com.sotaynauan.ai.data.model.AiRecipeSuggestionState;
 import com.sotaynauan.ai.data.model.AiChefState;
 import com.sotaynauan.ai.data.model.ConfirmedIngredient;
+import com.sotaynauan.ai.data.model.DetectedIngredient;
 import com.sotaynauan.ai.data.model.IngredientConfirmState;
 import com.sotaynauan.ai.data.model.IngredientInputState;
 import com.sotaynauan.ai.data.model.MatchDetailState;
@@ -90,7 +91,21 @@ public class AiChefRepository {
     }
 
     public IngredientInputState getIngredientInputState() {
-        return localDataSource.getIngredientInputState();
+        IngredientInputState currentState = localDataSource.getIngredientInputState();
+        List<String> homeIngredients = getHomeIngredientNames();
+        if (homeIngredients.isEmpty()) {
+            return currentState;
+        }
+        List<String> mergedIngredients = mergeIngredients(homeIngredients,
+                currentState.getIngredients());
+        if (hasSameIngredientList(currentState.getIngredients(), mergedIngredients)) {
+            return currentState;
+        }
+        String action = currentState.getCount() == 0
+                ? "Đã nạp " + homeIngredients.size()
+                + " nguyên liệu đang có ở nhà từ kho local."
+                : "Đã cộng nguyên liệu trong bếp với rổ nhập tay để gợi ý món chính xác hơn.";
+        return localDataSource.saveIngredients(mergedIngredients, action);
     }
 
     public List<String> getIngredientSuggestions() {
@@ -113,6 +128,51 @@ public class AiChefRepository {
                 "Đã thêm " + normalized + " và lưu danh sách trên thiết bị.");
     }
 
+    public IngredientInputState addDetectedIngredients(List<DetectedIngredient> detections) {
+        List<String> inputIngredients = new ArrayList<>(
+                localDataSource.getIngredientInputState().getIngredients());
+        List<ConfirmedIngredient> confirmedIngredients = new ArrayList<>(
+                localDataSource.getIngredientConfirmState().getIngredients());
+        int addedCount = 0;
+        for (DetectedIngredient detection : detections) {
+            if (detection == null) {
+                continue;
+            }
+            String name = normalizeIngredient(detection.getName());
+            if (name.isEmpty()) {
+                continue;
+            }
+            if (!containsIngredient(inputIngredients, name)) {
+                inputIngredients.add(name);
+            }
+            String quantity = normalizeQuantity(detection.getQuantity());
+            if (quantity.isEmpty() && detection.getCount() > 0) {
+                quantity = String.valueOf(detection.getCount());
+            }
+            ConfirmedIngredient detectedIngredient = new ConfirmedIngredient(
+                    createIngredientId(confirmedIngredients.size() + addedCount),
+                    name,
+                    quantity,
+                    ConfirmedIngredient.SOURCE_CAMERA,
+                    true);
+            int existingIndex = findConfirmedIngredientIndex(confirmedIngredients, name);
+            if (existingIndex >= 0) {
+                ConfirmedIngredient existing = confirmedIngredients.get(existingIndex);
+                confirmedIngredients.set(existingIndex, existing.withContent(name,
+                        quantity.isEmpty() ? existing.getQuantity() : quantity));
+            } else {
+                confirmedIngredients.add(detectedIngredient);
+                addedCount++;
+            }
+        }
+        localDataSource.saveConfirmedIngredients(confirmedIngredients,
+                "YOLO đã nhận diện " + confirmedIngredients.size()
+                        + " nguyên liệu. Hãy kiểm tra lại số lượng trước khi tìm món.");
+        return localDataSource.saveIngredients(inputIngredients,
+                "Đã thêm " + Math.max(0, inputIngredients.size())
+                        + " nguyên liệu nhận diện từ camera vào rổ.");
+    }
+
     public IngredientInputState removeIngredient(String ingredient) {
         List<String> ingredients = new ArrayList<>(localDataSource.getIngredientInputState().getIngredients());
         String normalized = normalizeIngredient(ingredient);
@@ -127,26 +187,17 @@ public class AiChefRepository {
                 "Rổ nguyên liệu đã được cập nhật.");
     }
 
-    public IngredientInputState addOfflineScanIngredients() {
-        List<String> current = new ArrayList<>(localDataSource.getIngredientInputState().getIngredients());
-        Set<String> merged = new LinkedHashSet<>(current);
-        merged.add("Trứng gà");
-        merged.add("Cà chua");
-        merged.add("Hành lá");
-        return localDataSource.saveIngredients(new ArrayList<>(merged),
-                "Đã quét offline mẫu và thêm nguyên liệu nhận diện vào local storage.");
-    }
-
     public IngredientInputState markIngredientsReadyForSuggestions() {
-        List<String> ingredients = new ArrayList<>(localDataSource.getIngredientInputState().getIngredients());
+        List<String> ingredients = new ArrayList<>(getIngredientInputState().getIngredients());
         selectFeature(FLOW_INGREDIENT_MATCH);
         return localDataSource.saveIngredients(ingredients,
-                "Đã lưu " + ingredients.size() + " nguyên liệu. Mở màn xác nhận để chỉnh lại trước khi tìm món.");
+                "Đã lưu " + ingredients.size()
+                        + " nguyên liệu có sẵn. Mở màn xác nhận để chỉnh lại trước khi tìm món.");
     }
 
     public IngredientConfirmState prepareIngredientConfirmation() {
         IngredientConfirmState currentState = localDataSource.getIngredientConfirmState();
-        List<String> inputIngredients = localDataSource.getIngredientInputState().getIngredients();
+        List<String> inputIngredients = getIngredientInputState().getIngredients();
         if (currentState.getTotalCount() > 0 && hasSameIngredientNames(currentState, inputIngredients)) {
             return currentState;
         }
@@ -155,7 +206,11 @@ public class AiChefRepository {
         }
         List<ConfirmedIngredient> nextIngredients = new ArrayList<>();
         for (String ingredient : inputIngredients) {
-            nextIngredients.add(toConfirmedIngredient(ingredient, nextIngredients.size()));
+            ConfirmedIngredient existingIngredient = findConfirmedIngredient(
+                    currentState.getIngredients(), ingredient);
+            nextIngredients.add(existingIngredient == null
+                    ? toConfirmedIngredient(ingredient, nextIngredients.size())
+                    : existingIngredient);
         }
         if (nextIngredients.isEmpty()) {
             nextIngredients.add(new ConfirmedIngredient(createIngredientId(0),
@@ -265,7 +320,8 @@ public class AiChefRepository {
                 "Đã xác nhận " + selectedNames.size() + " nguyên liệu để tìm món gần nhất.");
         selectFeature(FLOW_INGREDIENT_MATCH);
         return localDataSource.saveConfirmedIngredients(state.getIngredients(),
-                "Đã xác nhận " + selectedNames.size() + " nguyên liệu. Phase 7 sẽ tính match score local từ danh sách này.");
+                "Đã xác nhận " + selectedNames.size()
+                        + " nguyên liệu. AI local sẽ xếp món theo số nguyên liệu cần mua thêm ít nhất.");
     }
 
     public AiRecipeSuggestionState calculateRecipeSuggestions() {
@@ -273,23 +329,40 @@ public class AiChefRepository {
             return new AiRecipeSuggestionState(Collections.emptyList(), Collections.emptyList(),
                     "Kho công thức local chưa được nối vào AI Chef.");
         }
-        List<String> selectedIngredients = getSelectedIngredientNames();
-        if (selectedIngredients.isEmpty()) {
-            selectedIngredients = localDataSource.getIngredientInputState().getIngredients();
-        }
-        if (selectedIngredients.isEmpty()) {
+        List<String> matchingIngredients = getAvailableIngredientsForMatching();
+        if (matchingIngredients.isEmpty()) {
             return new AiRecipeSuggestionState(Collections.emptyList(), Collections.emptyList(),
-                    "Chưa có nguyên liệu đã xác nhận. Hãy thêm nguyên liệu trước khi tìm món.");
+                    "Chưa có nguyên liệu ở kho nhà hoặc danh sách đã xác nhận. Hãy thêm nguyên liệu trước khi tìm món.");
         }
 
+        List<Recipe> recipes = recipeRepository.getAllRecipes();
         List<RecipeMatch> matches = new ArrayList<>();
-        for (Recipe recipe : recipeRepository.getAllRecipes()) {
-            matches.add(calculateMatch(recipe, selectedIngredients));
+        for (Recipe recipe : recipes) {
+            matches.add(calculateMatch(recipe, matchingIngredients));
         }
         Collections.sort(matches, new Comparator<RecipeMatch>() {
             @Override
             public int compare(RecipeMatch left, RecipeMatch right) {
-                return Integer.compare(right.getScorePercent(), left.getScorePercent());
+                int missingCompare = Integer.compare(left.getMissingIngredients().size(),
+                        right.getMissingIngredients().size());
+                if (missingCompare != 0) {
+                    return missingCompare;
+                }
+                int scoreCompare = Integer.compare(right.getScorePercent(), left.getScorePercent());
+                if (scoreCompare != 0) {
+                    return scoreCompare;
+                }
+                int availableCompare = Integer.compare(right.getAvailableCount(),
+                        left.getAvailableCount());
+                if (availableCompare != 0) {
+                    return availableCompare;
+                }
+                int popularityCompare = Integer.compare(right.getRecipe().getPopularityScore(),
+                        left.getRecipe().getPopularityScore());
+                if (popularityCompare != 0) {
+                    return popularityCompare;
+                }
+                return left.getRecipe().getName().compareToIgnoreCase(right.getRecipe().getName());
             }
         });
         if (matches.size() > 8) {
@@ -298,10 +371,10 @@ public class AiChefRepository {
         RecipeMatch bestMatch = matches.isEmpty() ? null : matches.get(0);
         String status = bestMatch == null
                 ? "Không tìm thấy công thức trong kho local."
-                : "AI local đã so khớp " + selectedIngredients.size()
-                + " nguyên liệu với " + recipeRepository.getAllRecipes().size()
-                + " công thức trong Room.";
-        return new AiRecipeSuggestionState(selectedIngredients, matches, status);
+                : "AI local đã so khớp " + matchingIngredients.size()
+                + " nguyên liệu đang có với " + recipes.size()
+                + " công thức trong Room, ưu tiên món cần mua thêm ít nguyên liệu nhất.";
+        return new AiRecipeSuggestionState(matchingIngredients, matches, status);
     }
 
     public AiRecipeSuggestionState calculateRecipeSuggestionsWithAiBackend() {
@@ -393,26 +466,27 @@ public class AiChefRepository {
             }
         }
 
+        float jaccardSimilarity = calculateJaccardSimilarity(recipeIngredients, selectedIngredients,
+                available.size());
         float requiredMatch = available.size() / (float) total;
         float mainMatch = mainCount == 0 ? 0f : matchedMain / (float) mainCount;
         float optionalMatch = matchedOptional / (float) optionalCount;
         float seasoningMatch = seasoningCount == 0 ? 1f : matchedSeasoning / (float) seasoningCount;
-        float userPreference = recipe.getPopularityScore() / 100f;
         float missingImportantPenalty = (mainCount - matchedMain) * 0.10f;
-        float score = requiredMatch * 0.4f
-                + mainMatch * 0.3f
-                + optionalMatch * 0.1f
-                + seasoningMatch * 0.1f
-                + userPreference * 0.1f
+        float score = requiredMatch * 0.50f
+                + jaccardSimilarity * 0.25f
+                + mainMatch * 0.15f
+                + optionalMatch * 0.05f
+                + seasoningMatch * 0.05f
                 - missingImportantPenalty;
-        int percent = Math.max(0, Math.min(99, Math.round(score * 100f)));
+        int percent = Math.max(0, Math.min(100, Math.round(score * 100f)));
         String label;
         if (missing.isEmpty()) {
             label = "Có thể nấu ngay";
         } else if (missing.size() <= 2) {
-            label = "Thiếu ít nguyên liệu";
+            label = "Cần mua thêm " + missing.size() + " nguyên liệu";
         } else {
-            label = "Cần bổ sung thêm";
+            label = "Cần bổ sung " + missing.size() + " nguyên liệu";
         }
         return new RecipeMatch(recipe, percent, available, missing, label,
                 localDataSource.isFavoriteRecipe(recipe.getId()));
@@ -440,6 +514,59 @@ public class AiChefRepository {
             return new ArrayList<>();
         }
         return rows;
+    }
+
+    private List<String> getAvailableIngredientsForMatching() {
+        return mergeIngredients(getHomeIngredientNames(),
+                getSelectedIngredientNames(),
+                localDataSource.getIngredientInputState().getIngredients());
+    }
+
+    private List<String> getHomeIngredientNames() {
+        List<String> names = new ArrayList<>();
+        if (database == null) {
+            return names;
+        }
+        for (PantryStockEntity stock : database.pantryDao().getAllStocks()) {
+            double available = Math.max(0d, stock.totalAmount - stock.reservedAmount);
+            if (available <= 0.0001d) {
+                continue;
+            }
+            IngredientEntity ingredient = database.ingredientDao().findById(stock.ingredientId);
+            String name = ingredient == null ? stock.ingredientId : ingredient.name;
+            String normalizedName = normalizeIngredient(name);
+            if (!normalizedName.isEmpty() && !containsIngredient(names, normalizedName)) {
+                names.add(normalizedName);
+            }
+        }
+        return names;
+    }
+
+    @SafeVarargs
+    private final List<String> mergeIngredients(List<String>... ingredientGroups) {
+        List<String> merged = new ArrayList<>();
+        for (List<String> ingredientGroup : ingredientGroups) {
+            for (String ingredient : ingredientGroup) {
+                String normalized = normalizeIngredient(ingredient);
+                if (!normalized.isEmpty() && !containsIngredient(merged, normalized)) {
+                    merged.add(normalized);
+                }
+            }
+        }
+        return merged;
+    }
+
+    private boolean hasSameIngredientList(List<String> left, List<String> right) {
+        if (left.size() != right.size()) {
+            return false;
+        }
+        for (int index = 0; index < left.size(); index++) {
+            if (!normalizeIngredient(left.get(index)).equalsIgnoreCase(
+                    normalizeIngredient(right.get(index)))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private String createAiExplanation(RecipeMatch match) {
@@ -524,16 +651,129 @@ public class AiChefRepository {
     }
 
     private boolean matchesAnyIngredient(String recipeIngredient, List<String> selectedIngredients) {
-        String normalizedRecipe = normalizeForMatch(recipeIngredient);
+        String normalizedRecipe = normalizeIngredientForSimilarity(recipeIngredient);
         for (String selectedIngredient : selectedIngredients) {
-            String normalizedSelected = normalizeForMatch(selectedIngredient);
+            String normalizedSelected = normalizeIngredientForSimilarity(selectedIngredient);
             if (!normalizedSelected.isEmpty()
                     && (normalizedRecipe.contains(normalizedSelected)
                     || normalizedSelected.contains(normalizedRecipe))) {
                 return true;
             }
+            if (hasMeaningfulTokenOverlap(normalizedRecipe, normalizedSelected)) {
+                return true;
+            }
         }
         return false;
+    }
+
+    private float calculateJaccardSimilarity(List<String> recipeIngredients,
+                                             List<String> selectedIngredients,
+                                             int matchedCount) {
+        Set<String> recipeKeys = new LinkedHashSet<>();
+        for (String recipeIngredient : recipeIngredients) {
+            String key = normalizeIngredientForSimilarity(recipeIngredient);
+            if (!key.isEmpty()) {
+                recipeKeys.add(key);
+            }
+        }
+        Set<String> selectedKeys = new LinkedHashSet<>();
+        for (String selectedIngredient : selectedIngredients) {
+            String key = normalizeIngredientForSimilarity(selectedIngredient);
+            if (!key.isEmpty()) {
+                selectedKeys.add(key);
+            }
+        }
+        int unionCount = recipeKeys.size() + selectedKeys.size() - matchedCount;
+        if (unionCount <= 0) {
+            return 0f;
+        }
+        return matchedCount / (float) unionCount;
+    }
+
+    private boolean hasMeaningfulTokenOverlap(String normalizedRecipe, String normalizedSelected) {
+        if (normalizedRecipe.isEmpty() || normalizedSelected.isEmpty()) {
+            return false;
+        }
+        List<String> recipeTokens = createIngredientTokens(normalizedRecipe);
+        List<String> selectedTokens = createIngredientTokens(normalizedSelected);
+        for (String selectedToken : selectedTokens) {
+            if (recipeTokens.contains(selectedToken)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<String> createIngredientTokens(String value) {
+        List<String> tokens = new ArrayList<>();
+        String[] rawTokens = value.split("\\s+");
+        for (String rawToken : rawTokens) {
+            if (!isMatchStopWord(rawToken) && !tokens.contains(rawToken)) {
+                tokens.add(rawToken);
+            }
+        }
+        return tokens;
+    }
+
+    private boolean isMatchStopWord(String value) {
+        return value.isEmpty()
+                || value.length() <= 1
+                || "gia".equals(value)
+                || "vị".equals(value)
+                || "thịt".equals(value)
+                || "tươi".equals(value)
+                || "khô".equals(value)
+                || "hoặc".equals(value)
+                || "băm".equals(value)
+                || "xay".equals(value)
+                || "nước".equals(value)
+                || "dầu".equals(value)
+                || "bột".equals(value)
+                || "rau".equals(value)
+                || "đậu".equals(value)
+                || "g".equals(value)
+                || "kg".equals(value)
+                || "ml".equals(value)
+                || "lít".equals(value)
+                || "muỗng".equals(value)
+                || "canh".equals(value)
+                || "cà".equals(value)
+                || "phê".equals(value)
+                || "quả".equals(value)
+                || "củ".equals(value)
+                || "nhánh".equals(value)
+                || "chén".equals(value)
+                || "nắm".equals(value);
+    }
+
+    private String normalizeIngredientForSimilarity(String value) {
+        String normalized = normalizeForMatch(extractIngredientName(value));
+        if (normalized.contains("cơm")) {
+            normalized = normalized + " gạo";
+        }
+        if (normalized.contains("trứng gà")) {
+            normalized = normalized.replace("trứng gà", "trứng");
+        }
+        if (normalized.contains("thịt lợn")) {
+            normalized = normalized.replace("thịt lợn", "thịt heo");
+        }
+        return normalized;
+    }
+
+    private String extractIngredientName(String value) {
+        if (value == null) {
+            return "";
+        }
+        String name = value;
+        int dashIndex = name.indexOf(" - ");
+        if (dashIndex >= 0 && dashIndex + 3 < name.length()) {
+            name = name.substring(dashIndex + 3);
+        }
+        int colonIndex = name.indexOf(":");
+        if (colonIndex >= 0) {
+            name = name.substring(0, colonIndex);
+        }
+        return name;
     }
 
     private String normalizeForMatch(String value) {
@@ -563,6 +803,26 @@ public class AiChefRepository {
             }
         }
         return false;
+    }
+
+    private int findConfirmedIngredientIndex(List<ConfirmedIngredient> ingredients, String target) {
+        for (int index = 0; index < ingredients.size(); index++) {
+            if (ingredients.get(index).getName().equalsIgnoreCase(target)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private ConfirmedIngredient findConfirmedIngredient(List<ConfirmedIngredient> ingredients,
+                                                        String target) {
+        String normalizedTarget = normalizeIngredient(target);
+        for (ConfirmedIngredient ingredient : ingredients) {
+            if (ingredient.getName().equalsIgnoreCase(normalizedTarget)) {
+                return ingredient;
+            }
+        }
+        return null;
     }
 
     private String normalizeIngredient(String value) {

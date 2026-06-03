@@ -8,14 +8,21 @@ const PORT = Number(process.env.PORT || 8787);
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const YOLO_DETECT_URL = process.env.YOLO_DETECT_URL || "";
+const YOLO_TIMEOUT_MS = Number(process.env.YOLO_TIMEOUT_MS || 20000);
 
 const server = http.createServer(async (req, res) => {
   try {
     if (req.method === "GET" && req.url === "/health") {
+      const yoloHealth = await checkYoloHealth();
       sendJson(res, 200, {
         ok: true,
         model: GEMINI_MODEL,
-        geminiConfigured: Boolean(GEMINI_API_KEY)
+        geminiConfigured: Boolean(GEMINI_API_KEY),
+        yoloConfigured: Boolean(YOLO_DETECT_URL),
+        yoloReady: yoloHealth.ready,
+        yoloError: yoloHealth.error,
+        yoloDetectUrl: YOLO_DETECT_URL ? maskServiceUrl(YOLO_DETECT_URL) : ""
       });
       return;
     }
@@ -24,6 +31,23 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const text = await callGemini(buildRecipePrompt(body));
       sendJson(res, 200, { text, provider: "gemini", model: GEMINI_MODEL });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/ai/ingredient-detection") {
+      const body = await readJson(req);
+      if (!YOLO_DETECT_URL) {
+        sendJson(res, 503, {
+          error: "YOLO detector chưa được cấu hình. Hãy đặt YOLO_DETECT_URL=https://.../detect trong backend/.env."
+        });
+        return;
+      }
+      const payload = await callYoloDetector(body);
+      sendJson(res, 200, {
+        ingredients: normalizeIngredientRows(payload.ingredients),
+        provider: "yolo",
+        model: payload.model || "yolo26s-ingredients-v1"
+      });
       return;
     }
 
@@ -90,7 +114,7 @@ function readJson(req) {
     let data = "";
     req.on("data", chunk => {
       data += chunk;
-      if (data.length > 1024 * 1024) {
+      if (data.length > 8 * 1024 * 1024) {
         req.destroy();
         reject(new Error("Request body is too large"));
       }
@@ -173,6 +197,72 @@ async function callGeminiPayload(payload) {
   return JSON.parse(payloadText);
 }
 
+async function callYoloDetector(body) {
+  const imageBase64 = String(body.imageBase64 || "");
+  const mimeType = String(body.mimeType || "image/jpeg");
+  if (!imageBase64) {
+    throw new Error("imageBase64 is required");
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), YOLO_TIMEOUT_MS);
+  try {
+    const response = await fetch(YOLO_DETECT_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      signal: controller.signal,
+      body: JSON.stringify({ imageBase64, mimeType })
+    });
+    const payloadText = await response.text();
+    if (!response.ok) {
+      throw new Error(`YOLO detector ${response.status}: ${payloadText}`);
+    }
+    try {
+      return JSON.parse(payloadText);
+    } catch (error) {
+      throw new Error(`YOLO detector JSON parse failed: ${payloadText}`);
+    }
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error(`YOLO detector timeout sau ${YOLO_TIMEOUT_MS}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function checkYoloHealth() {
+  if (!YOLO_DETECT_URL) {
+    return { ready: false, error: "YOLO_DETECT_URL is not configured" };
+  }
+  let healthUrl;
+  try {
+    const detectUrl = new URL(YOLO_DETECT_URL);
+    detectUrl.pathname = detectUrl.pathname.replace(/\/detect\/?$/, "/health");
+    healthUrl = detectUrl.toString();
+  } catch (error) {
+    return { ready: false, error: "YOLO_DETECT_URL is invalid" };
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2000);
+  try {
+    const response = await fetch(healthUrl, { signal: controller.signal });
+    if (!response.ok) {
+      return { ready: false, error: `YOLO health ${response.status}` };
+    }
+    return { ready: true, error: "" };
+  } catch (error) {
+    return {
+      ready: false,
+      error: error.name === "AbortError" ? "YOLO health timeout" : error.message
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function buildRecipePrompt(body) {
   const ingredients = Array.isArray(body.selectedIngredients) ? body.selectedIngredients : [];
   const pantry = Array.isArray(body.pantryItems) ? body.pantryItems : [];
@@ -193,6 +283,150 @@ function buildRecipePrompt(body) {
     `Các món app đã so khớp local: ${topMatches || "chưa có món phù hợp"}.`,
     "Hãy nêu món nên nấu trước, lý do ngắn, phần cần mua nếu matches có nêu, và một mẹo nhỏ."
   ].join(" ");
+}
+
+function buildIngredientDetectionParts(body) {
+  const imageBase64 = String(body.imageBase64 || "");
+  const mimeType = String(body.mimeType || "image/jpeg");
+  if (!imageBase64) {
+    throw new Error("imageBase64 is required");
+  }
+  return [
+    {
+      text: [
+        "Bạn là bộ nhận diện nguyên liệu nấu ăn từ ảnh camera.",
+        "Trả JSON hợp lệ dạng {\"ingredients\":[\"...\"]}.",
+        "Chỉ liệt kê tên nguyên liệu nhìn thấy rõ, tiếng Việt, không ghi số lượng.",
+        "Ưu tiên tên ngắn dùng được trong app: trứng, cà chua, hành lá, tỏi, thịt gà, thịt heo, thịt bò, tôm, cá, rau muống, bún, cơm, nước mắm.",
+        "Không thêm giải thích, không markdown, không bịa nguyên liệu không thấy."
+      ].join(" ")
+    },
+    {
+      inlineData: {
+        mimeType,
+        data: imageBase64
+      }
+    }
+  ];
+}
+
+function normalizeIngredientRows(rows) {
+  const source = Array.isArray(rows) ? rows : [];
+  const seen = new Set();
+  const ingredients = [];
+  for (const row of source) {
+    const normalized = normalizeIngredientRow(row);
+    if (!normalized.name) {
+      continue;
+    }
+    const key = normalized.name.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      ingredients.push(normalized);
+    }
+  }
+  return ingredients.slice(0, 8);
+}
+
+function normalizeIngredientRow(row) {
+  if (typeof row === "string") {
+    const name = cleanText(row);
+    return {
+      name,
+      quantity: "",
+      count: 0,
+      confidence: 0,
+      boxes: []
+    };
+  }
+  const source = row && typeof row === "object" ? row : {};
+  const name = cleanText(source.name || source.label || source.className || "");
+  const count = Math.max(0, Number.isFinite(Number(source.count)) ? Math.round(Number(source.count)) : 0);
+  const boxes = Array.isArray(source.boxes)
+    ? source.boxes.map(normalizeBox).filter(Boolean)
+    : [];
+  const confidence = clamp01(Number.isFinite(Number(source.confidence))
+    ? Number(source.confidence)
+    : averageConfidence(boxes));
+  const quantity = cleanText(source.quantity || quantityFromCount(name, count));
+  return {
+    name,
+    quantity,
+    count,
+    confidence,
+    boxes
+  };
+}
+
+function normalizeBox(box) {
+  if (!box || typeof box !== "object") {
+    return null;
+  }
+  return {
+    x1: finiteNumber(box.x1),
+    y1: finiteNumber(box.y1),
+    x2: finiteNumber(box.x2),
+    y2: finiteNumber(box.y2),
+    confidence: clamp01(finiteNumber(box.confidence))
+  };
+}
+
+function quantityFromCount(name, count) {
+  if (!name || count <= 0) {
+    return "";
+  }
+  const unit = unitForIngredient(name);
+  return unit ? `${count} ${unit}` : "";
+}
+
+function unitForIngredient(name) {
+  const normalized = name.toLowerCase();
+  if (/(trứng|cà chua|chanh|ớt|dưa leo)/.test(normalized)) {
+    return "quả";
+  }
+  if (/(tỏi|hành tím|hành tây|cà rốt|khoai tây|gừng|sả)/.test(normalized)) {
+    return "củ";
+  }
+  if (/(hành lá|rau muống|cải xanh|bắp cải)/.test(normalized)) {
+    return "bó";
+  }
+  if (/(thịt|cá|tôm|mực|đậu hũ|bún|mì|gạo|cơm|nấm|bí đỏ)/.test(normalized)) {
+    return count === 1 ? "phần" : "phần";
+  }
+  return "";
+}
+
+function cleanText(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function finiteNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function clamp01(value) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(1, value));
+}
+
+function averageConfidence(boxes) {
+  if (!boxes.length) {
+    return 0;
+  }
+  const total = boxes.reduce((sum, box) => sum + finiteNumber(box.confidence), 0);
+  return total / boxes.length;
+}
+
+function maskServiceUrl(value) {
+  try {
+    const url = new URL(value);
+    return `${url.protocol}//${url.host}${url.pathname}`;
+  } catch (error) {
+    return "configured";
+  }
 }
 
 function buildVoicePrompt(body) {

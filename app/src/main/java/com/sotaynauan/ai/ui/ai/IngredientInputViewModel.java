@@ -1,5 +1,6 @@
 package com.sotaynauan.ai.ui.ai;
 
+import com.sotaynauan.ai.data.model.DetectedIngredient;
 import com.sotaynauan.ai.data.model.IngredientInputState;
 import com.sotaynauan.ai.data.repository.AiChefRepository;
 
@@ -24,12 +25,12 @@ public class IngredientInputViewModel {
         return repository.addIngredient(ingredient);
     }
 
-    public IngredientInputState removeIngredient(String ingredient) {
-        return repository.removeIngredient(ingredient);
+    public IngredientInputState addDetectedIngredients(List<DetectedIngredient> ingredients) {
+        return repository.addDetectedIngredients(ingredients);
     }
 
-    public IngredientInputState scanOfflineSample() {
-        return repository.addOfflineScanIngredients();
+    public IngredientInputState removeIngredient(String ingredient) {
+        return repository.removeIngredient(ingredient);
     }
 
     public IngredientInputState markReadyForSuggestions() {

@@ -42,7 +42,15 @@
 <string name="ingredient_suggestions_label">Gợi ý:</string>
 <string name="ingredient_basket_title">Rổ nguyên liệu của bạn</string>
 <string name="ingredient_empty_state">Chưa có nguyên liệu nào</string>
-<string name="ingredient_camera_scan">Quét bằng camera offline\nThêm nhanh Trứng gà, Cà chua, Hành lá vào rổ</string>
+<string name="ingredient_camera_scan">Quét bằng camera thật\nGửi ảnh cho backend YOLO nhận diện nguyên liệu</string>
+<string name="ingredient_camera_ready">Đưa nguyên liệu vào khung hình</string>
+<string name="ingredient_camera_starting">Đang mở camera trên thiết bị...</string>
+<string name="ingredient_camera_permission_denied">Bạn cần cấp quyền camera để quét nguyên liệu.</string>
+<string name="ingredient_camera_unavailable">Thiết bị chưa có camera khả dụng.</string>
+<string name="ingredient_camera_capture">Chụp nguyên liệu</string>
+<string name="ingredient_camera_capturing">Đang chụp ảnh...</string>
+<string name="ingredient_camera_capture_failed">Không chụp được ảnh. Vui lòng thử lại.</string>
+<string name="ingredient_camera_switch">⇄</string>
 <string name="ingredient_find_recipes">Gợi ý món từ nguyên liệu vừa nhập</string>
 <string name="ingredient_confirm_title">Xác nhận nguyên liệu</string>
 <string name="ingredient_confirm_intro">Chúng tôi đã tìm thấy những nguyên liệu này. Bạn có muốn điều chỉnh gì không?</string>

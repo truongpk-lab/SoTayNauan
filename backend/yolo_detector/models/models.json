@@ -1,0 +1,17 @@
+{
+  "defaultModelId": "original_yolov8s",
+  "models": {
+    "original_yolov8s": {
+      "displayName": "Original YOLOv8s",
+      "weightPath": "original_yolov8s/model.pt",
+      "task": "detect",
+      "source": "local",
+      "modelName": "original-yolov8s",
+      "confidence": 0.35,
+      "iou": 0.55,
+      "imageSize": 960,
+      "maxResults": 12,
+      "notes": "Base YOLOv8s weight supplied in the project. COCO labels are filtered/mapped to food ingredients where possible."
+    }
+  }
+}

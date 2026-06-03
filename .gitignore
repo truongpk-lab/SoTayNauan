@@ -14,7 +14,14 @@ build/
 app/build/
 backend/node_modules/
 backend/.env
+backend/yolo_detector/.venv/
+backend/yolo_detector/models/*/model.pt
+__pycache__/
+*.pyc
 local.properties
+
+# Cho phép tài liệu registry model được commit dù rule *.md ở trên đang bỏ qua markdown
+!backend/yolo_detector/models/README.md
 
 # File hệ thống/không cần thiết
 nul

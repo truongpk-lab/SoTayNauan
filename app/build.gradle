@@ -7,7 +7,8 @@ def localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localPropertiesFile.withInputStream { localProperties.load(it) }
 }
-def aiBackendBaseUrl = localProperties.getProperty("AI_BACKEND_BASE_URL", "http://10.0.2.2:8787")
+def debugAiBackendBaseUrl = localProperties.getProperty("AI_BACKEND_BASE_URL", "http://127.0.0.1:8787")
+def releaseAiBackendBaseUrl = localProperties.getProperty("AI_BACKEND_BASE_URL_RELEASE", "https://your-ai-backend.example.com")
 
 android {
     namespace "com.sotaynauan.ai"
@@ -19,16 +20,35 @@ android {
         targetSdk 35
         versionCode 1
         versionName "1.0"
-        buildConfigField "String", "AI_BACKEND_BASE_URL", "\"${aiBackendBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\""
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        debug {
+            buildConfigField "String", "AI_BACKEND_BASE_URL", "\"${debugAiBackendBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+        }
+        release {
+            buildConfigField "String", "AI_BACKEND_BASE_URL", "\"${releaseAiBackendBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+        }
     }
 
     buildFeatures {
         buildConfig true
     }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
 }
 
 dependencies {
+    def camerax_version = "1.5.3"
+    implementation "androidx.activity:activity:1.10.1"
+    implementation "androidx.camera:camera-camera2:${camerax_version}"
+    implementation "androidx.camera:camera-lifecycle:${camerax_version}"
+    implementation "androidx.camera:camera-view:${camerax_version}"
     implementation "androidx.room:room-runtime:2.6.1"
     annotationProcessor "androidx.room:room-compiler:2.6.1"
     testImplementation "junit:junit:4.13.2"
