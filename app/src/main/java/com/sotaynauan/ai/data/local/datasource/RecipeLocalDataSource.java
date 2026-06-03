@@ -74,6 +74,11 @@ public class RecipeLocalDataSource {
 
     public long addRecipe(RecipeEntity recipe) {
         seedIfNeeded();
+        if (recipe == null || recipe.name == null || recipe.name.trim().isEmpty()
+                || recipeDao.findByNormalizedName(recipe.name.trim()) != null) {
+            return -1L;
+        }
+        recipe.name = recipe.name.trim();
         return recipeDao.insert(recipe);
     }
 }

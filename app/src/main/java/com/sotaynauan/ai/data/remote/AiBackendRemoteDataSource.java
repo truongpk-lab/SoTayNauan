@@ -17,6 +17,7 @@ import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import android.util.Base64;
 import java.util.List;
 
@@ -36,6 +37,44 @@ public class AiBackendRemoteDataSource {
 
     public boolean isConfigured() {
         return !baseUrl.isEmpty();
+    }
+
+    public List<RecipeNameSuggestion> suggestRelatedRecipes(String dishName,
+                                                            List<String> existingRecipeNames)
+            throws IOException, JSONException {
+        JSONArray existingRows = new JSONArray();
+        if (existingRecipeNames != null) {
+            for (String existingRecipeName : existingRecipeNames) {
+                existingRows.put(existingRecipeName == null ? "" : existingRecipeName);
+            }
+        }
+        JSONObject response = postForJson("/api/ai/related-recipes", new JSONObject()
+                .put("dishName", dishName == null ? "" : dishName)
+                .put("existingRecipeNames", existingRows));
+        JSONArray rows = response.optJSONArray("suggestions");
+        List<RecipeNameSuggestion> suggestions = new ArrayList<>();
+        if (rows == null) {
+            return suggestions;
+        }
+        for (int index = 0; index < rows.length(); index++) {
+            JSONObject row = rows.optJSONObject(index);
+            if (row == null) {
+                continue;
+            }
+            String name = row.optString("name", "").trim();
+            if (!name.isEmpty()) {
+                suggestions.add(new RecipeNameSuggestion(name,
+                        row.optString("reason", "").trim()));
+            }
+        }
+        return suggestions;
+    }
+
+    public GeneratedRecipe generateRecipeFromWeb(String recipeName)
+            throws IOException, JSONException {
+        JSONObject response = postForJson("/api/ai/import-recipe", new JSONObject()
+                .put("recipeName", recipeName == null ? "" : recipeName));
+        return GeneratedRecipe.fromJson(response.optJSONObject("recipe"));
     }
 
     public String generateRecipeAdvice(List<String> selectedIngredients,
@@ -207,7 +246,7 @@ public class AiBackendRemoteDataSource {
                     ? connection.getInputStream()
                     : connection.getErrorStream());
             if (statusCode < 200 || statusCode >= 300) {
-                throw new IOException("AI backend lỗi " + statusCode + ": " + response);
+                throw new IOException(createReadableBackendError(statusCode, response));
             }
             return new JSONObject(response);
         } finally {
@@ -247,5 +286,131 @@ public class AiBackendRemoteDataSource {
         public String getCommand() {
             return command;
         }
+    }
+
+    private String createReadableBackendError(int statusCode, String response) {
+        String fallback = "AI backend lỗi " + statusCode + ".";
+        if (response == null || response.trim().isEmpty()) {
+            return fallback;
+        }
+        try {
+            JSONObject object = new JSONObject(response);
+            String message = object.optString("message", "").trim();
+            if (message.isEmpty()) {
+                message = object.optString("error", "").trim();
+            }
+            int retryAfterSeconds = object.optInt("retryAfterSeconds", 0);
+            if (message.isEmpty()) {
+                return fallback;
+            }
+            if (retryAfterSeconds > 0 && !message.contains(String.valueOf(retryAfterSeconds))) {
+                message += " Thử lại sau khoảng " + retryAfterSeconds + " giây.";
+            }
+            return message;
+        } catch (JSONException exception) {
+            String compact = response.trim().replaceAll("\\s+", " ");
+            if (compact.length() > 240) {
+                compact = compact.substring(0, 240) + "...";
+            }
+            return fallback + " " + compact;
+        }
+    }
+
+    public static class RecipeNameSuggestion {
+        private final String name;
+        private final String reason;
+
+        public RecipeNameSuggestion(String name, String reason) {
+            this.name = name;
+            this.reason = reason;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getReason() {
+            return reason;
+        }
+    }
+
+    public static class GeneratedRecipe {
+        private final String name;
+        private final String description;
+        private final int totalMinutes;
+        private final String difficulty;
+        private final String category;
+        private final String serving;
+        private final String calories;
+        private final String cost;
+        private final String imageUrl;
+        private final List<String> ingredients;
+        private final List<String> steps;
+
+        public GeneratedRecipe(String name, String description, int totalMinutes,
+                               String difficulty, String category, String serving,
+                               String calories, String cost, String imageUrl, List<String> ingredients,
+                               List<String> steps) {
+            this.name = name;
+            this.description = description;
+            this.totalMinutes = totalMinutes;
+            this.difficulty = difficulty;
+            this.category = category;
+            this.serving = serving;
+            this.calories = calories;
+            this.cost = cost;
+            this.imageUrl = imageUrl == null ? "" : imageUrl;
+            this.ingredients = new ArrayList<>(ingredients);
+            this.steps = new ArrayList<>(steps);
+        }
+
+        private static GeneratedRecipe fromJson(JSONObject object) throws IOException {
+            if (object == null) {
+                throw new IOException("AI backend chưa trả về công thức.");
+            }
+            String name = object.optString("name", "").trim();
+            List<String> ingredients = readStringArray(object.optJSONArray("ingredients"));
+            List<String> steps = readStringArray(object.optJSONArray("steps"));
+            if (name.isEmpty() || ingredients.isEmpty() || steps.isEmpty()) {
+                throw new IOException("Công thức AI thiếu tên món, nguyên liệu hoặc bước nấu.");
+            }
+            return new GeneratedRecipe(name,
+                    object.optString("description", "").trim(),
+                    Math.max(5, object.optInt("totalMinutes", 30)),
+                    object.optString("difficulty", "Trung bình").trim(),
+                    object.optString("category", "Món gia đình").trim(),
+                    object.optString("serving", "2 người").trim(),
+                    object.optString("calories", "").trim(),
+                    object.optString("cost", "").trim(),
+                    object.optString("imageUrl", "").trim(),
+                    ingredients,
+                    steps);
+        }
+
+        private static List<String> readStringArray(JSONArray rows) {
+            List<String> values = new ArrayList<>();
+            if (rows == null) {
+                return values;
+            }
+            for (int index = 0; index < rows.length(); index++) {
+                String value = rows.optString(index, "").trim();
+                if (!value.isEmpty()) {
+                    values.add(value);
+                }
+            }
+            return values;
+        }
+
+        public String getName() { return name; }
+        public String getDescription() { return description; }
+        public int getTotalMinutes() { return totalMinutes; }
+        public String getDifficulty() { return difficulty; }
+        public String getCategory() { return category; }
+        public String getServing() { return serving; }
+        public String getCalories() { return calories; }
+        public String getCost() { return cost; }
+        public String getImageUrl() { return imageUrl; }
+        public List<String> getIngredients() { return new ArrayList<>(ingredients); }
+        public List<String> getSteps() { return new ArrayList<>(steps); }
     }
 }

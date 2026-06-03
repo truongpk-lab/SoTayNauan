@@ -3,8 +3,10 @@ package com.sotaynauan.ai.data.mapper;
 import com.sotaynauan.ai.data.local.entity.RecipeEntity;
 import com.sotaynauan.ai.data.model.Recipe;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class RecipeMapper {
     private static final String SEPARATOR = "\\|";
@@ -17,7 +19,7 @@ public class RecipeMapper {
                 entity.description,
                 entity.totalMinutes,
                 entity.difficulty,
-                entity.category,
+                resolveCategory(entity),
                 nullToEmpty(entity.imageName),
                 nullToEmpty(entity.serving),
                 nullToEmpty(entity.calories),
@@ -67,6 +69,68 @@ public class RecipeMapper {
 
     private String nullToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private String resolveCategory(RecipeEntity entity) {
+        String category = nullToEmpty(entity.category).trim();
+        if (!category.isEmpty() && !"Công thức của tôi".equalsIgnoreCase(category)) {
+            return category;
+        }
+        String inferred = inferCategory(entity);
+        return inferred.isEmpty() ? category : inferred;
+    }
+
+    private String inferCategory(RecipeEntity entity) {
+        String text = normalize(nullToEmpty(entity.name) + " "
+                + nullToEmpty(entity.description) + " "
+                + nullToEmpty(entity.ingredients));
+        if (containsAny(text, "canh", "kho qua nhoi thit")) {
+            return "Canh";
+        }
+        if (containsAny(text, "lau")) {
+            return "Lẩu";
+        }
+        if (containsAny(text, "kho", "rim")) {
+            return "Món kho";
+        }
+        if (containsAny(text, "xao")) {
+            return "Món xào";
+        }
+        if (containsAny(text, "chien", "ran")) {
+            return "Món chiên";
+        }
+        if (containsAny(text, "nuong")) {
+            return "Món nướng";
+        }
+        if (containsAny(text, "bun", "pho", "hu tieu", "mi ")) {
+            return "Món nước";
+        }
+        if (containsAny(text, "com")) {
+            return "Món cơm";
+        }
+        if (containsAny(text, "goi", "salad")) {
+            return "Gỏi & Salad";
+        }
+        if (containsAny(text, "banh")) {
+            return "Món bánh";
+        }
+        return "";
+    }
+
+    private boolean containsAny(String value, String... needles) {
+        for (String needle : needles) {
+            if (value.contains(needle)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String normalize(String value) {
+        String safeValue = value == null ? "" : value;
+        String normalized = Normalizer.normalize(safeValue, Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+        return normalized.toLowerCase(Locale.US).replace('đ', 'd').replaceAll("\\s+", " ").trim();
     }
 
     private List<String> split(String raw) {

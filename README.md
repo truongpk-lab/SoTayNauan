@@ -30,6 +30,21 @@ YOLO_TIMEOUT_MS=20000
 YOLO_MODEL_ID=original_yolov8s
 ```
 
+Anh mon an cho cong thuc AI co pipeline nhieu tang. Neu khong dien key, backend van co gang lay anh tu structured data cua trang cong thuc va Wikimedia/Wikipedia. De tang ti le dung anh mon that, co the dien them:
+
+```env
+IMAGE_SEARCH_TIMEOUT_MS=7000
+RECIPE_IMAGE_MIN_SCORE=58
+RECIPE_IMAGE_SOURCE_SITES=cooky.vn,dienmayxanh.com,bachhoaxanh.com,ngonaz.com,thatlangon.com,afamily.vn
+GOOGLE_CSE_API_KEY=
+GOOGLE_CSE_ID=
+PIXABAY_API_KEY=
+PEXELS_API_KEY=
+UNSPLASH_ACCESS_KEY=
+```
+
+Thu tu uu tien anh: anh trong JSON-LD `schema.org/Recipe` cua trang cong thuc, Open Graph cua trang cong thuc, Google Custom Search image neu co key, Pixabay/Pexels/Unsplash neu co key, roi Wikimedia/Wikipedia fallback. App Android se tai anh duoc chon ve local truoc khi luu cong thuc.
+
 ## Khoi chay moi bang 3 terminal
 
 Mo 3 terminal Windows rieng biet. De Terminal 1 va Terminal 2 tiep tuc chay, roi chay Terminal 3.

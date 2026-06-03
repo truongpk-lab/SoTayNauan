@@ -51,6 +51,13 @@ public class SearchActivity extends Activity {
     private static final String CATEGORY_STIR_FRIED = "xào";
     private static final String CATEGORY_GRILLED = "nướng";
     private static final String CATEGORY_SOUP = "món nước";
+    private static final String CATEGORY_CANH = "canh";
+    private static final String CATEGORY_BRAISED = "kho";
+    private static final String CATEGORY_RICE = "cơm";
+    private static final String CATEGORY_NOODLE = "bún phở";
+    private static final String CATEGORY_HOTPOT = "lẩu";
+    private static final String CATEGORY_SALAD = "gỏi salad";
+    private static final String CATEGORY_CAKE = "bánh";
     private static final String CATEGORY_STEAMED = "hấp";
     private static final String CATEGORY_BOILED = "luộc";
     private static final String CATEGORY_DESSERT = "tráng miệng";
@@ -259,7 +266,17 @@ public class SearchActivity extends Activity {
                 new FilterItem("Nướng", CATEGORY_GRILLED));
         addCategoryRow(
                 new FilterItem("Món nước", CATEGORY_SOUP),
-                new FilterItem("Hấp", CATEGORY_STEAMED),
+                new FilterItem("Canh", CATEGORY_CANH),
+                new FilterItem("Kho", CATEGORY_BRAISED));
+        addCategoryRow(
+                new FilterItem("Cơm", CATEGORY_RICE),
+                new FilterItem("Bún/Phở", CATEGORY_NOODLE),
+                new FilterItem("Lẩu", CATEGORY_HOTPOT));
+        addCategoryRow(
+                new FilterItem("Gỏi/Salad", CATEGORY_SALAD),
+                new FilterItem("Bánh", CATEGORY_CAKE),
+                new FilterItem("Hấp", CATEGORY_STEAMED));
+        addCategoryRow(
                 new FilterItem("Luộc", CATEGORY_BOILED));
         addCategoryRow(
                 new FilterItem("Tráng miệng", CATEGORY_DESSERT),
@@ -383,8 +400,7 @@ public class SearchActivity extends Activity {
 
         List<Recipe> filtered = new ArrayList<>();
         for (Recipe recipe : allRecipes) {
-            if (!selectedCategory.isEmpty()
-                    && !normalize(recipe.getCategory()).contains(normalize(selectedCategory))) {
+            if (!selectedCategory.isEmpty() && !matchesCategory(recipe, selectedCategory)) {
                 continue;
             }
             if (!selectedDifficulty.isEmpty()
@@ -398,6 +414,55 @@ public class SearchActivity extends Activity {
         }
         sortRecipes(filtered, normalizedQuery);
         return filtered;
+    }
+
+    private boolean matchesCategory(Recipe recipe, String categoryFilter) {
+        String filter = normalize(categoryFilter);
+        if (filter.isEmpty()) {
+            return true;
+        }
+        String searchable = normalize(recipe.getCategory() + " " + recipe.getName() + " "
+                + recipe.getDescription());
+        if (searchable.contains(filter)) {
+            return true;
+        }
+        if (normalize(CATEGORY_SOUP).equals(filter)) {
+            return containsAny(searchable, "mon nuoc", "bun", "pho", "hu tieu", "mi quang", "lau");
+        }
+        if (normalize(CATEGORY_CANH).equals(filter)) {
+            return containsAny(searchable, "canh", "kho qua nhoi thit");
+        }
+        if (normalize(CATEGORY_BRAISED).equals(filter)) {
+            return containsAny(searchable, "kho", "rim");
+        }
+        if (normalize(CATEGORY_RICE).equals(filter)) {
+            return containsAny(searchable, "com");
+        }
+        if (normalize(CATEGORY_NOODLE).equals(filter)) {
+            return containsAny(searchable, "bun", "pho", "hu tieu", "mi quang", "mi xao");
+        }
+        if (normalize(CATEGORY_HOTPOT).equals(filter)) {
+            return containsAny(searchable, "lau");
+        }
+        if (normalize(CATEGORY_SALAD).equals(filter)) {
+            return containsAny(searchable, "goi", "salad");
+        }
+        if (normalize(CATEGORY_CAKE).equals(filter)) {
+            return containsAny(searchable, "banh");
+        }
+        if (normalize(CATEGORY_DRINK).equals(filter)) {
+            return containsAny(searchable, "nuoc uong", "sinh to", "ca phe", "nuoc cam");
+        }
+        return false;
+    }
+
+    private boolean containsAny(String value, String... needles) {
+        for (String needle : needles) {
+            if (value.contains(needle)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void sortRecipes(List<Recipe> recipes, String normalizedQuery) {
@@ -545,9 +610,12 @@ public class SearchActivity extends Activity {
         item.setGravity(Gravity.CENTER);
         item.setPadding(dp(10), dp(14), dp(10), dp(14));
         item.setOnClickListener(listener);
-        item.setBackgroundResource(active ? R.drawable.bg_home_tab_active : 0);
+        item.setBackgroundResource(active
+                ? R.drawable.bg_home_tab_active
+                : R.drawable.bg_home_tab_inactive);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                0, dp(48), 1f);
+        params.setMargins(dp(2), 0, dp(2), 0);
         item.setLayoutParams(params);
         return item;
     }

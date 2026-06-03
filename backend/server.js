@@ -10,6 +10,21 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const YOLO_DETECT_URL = process.env.YOLO_DETECT_URL || "";
 const YOLO_TIMEOUT_MS = Number(process.env.YOLO_TIMEOUT_MS || 20000);
+const IMAGE_SEARCH_TIMEOUT_MS = Number(process.env.IMAGE_SEARCH_TIMEOUT_MS || 7000);
+const GOOGLE_CSE_API_KEY = process.env.GOOGLE_CSE_API_KEY || "";
+const GOOGLE_CSE_ID = process.env.GOOGLE_CSE_ID || "";
+const PIXABAY_API_KEY = process.env.PIXABAY_API_KEY || "";
+const PEXELS_API_KEY = process.env.PEXELS_API_KEY || "";
+const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY || "";
+const RECIPE_IMAGE_MIN_SCORE = Number(process.env.RECIPE_IMAGE_MIN_SCORE || 58);
+const RECIPE_IMAGE_SOURCE_SITES = (process.env.RECIPE_IMAGE_SOURCE_SITES || [
+  "cooky.vn",
+  "dienmayxanh.com",
+  "bachhoaxanh.com",
+  "ngonaz.com",
+  "thatlangon.com",
+  "afamily.vn"
+].join(",")).split(",").map(value => value.trim()).filter(Boolean);
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -22,7 +37,14 @@ const server = http.createServer(async (req, res) => {
         yoloConfigured: Boolean(YOLO_DETECT_URL),
         yoloReady: yoloHealth.ready,
         yoloError: yoloHealth.error,
-        yoloDetectUrl: YOLO_DETECT_URL ? maskServiceUrl(YOLO_DETECT_URL) : ""
+        yoloDetectUrl: YOLO_DETECT_URL ? maskServiceUrl(YOLO_DETECT_URL) : "",
+        recipeImageSearch: {
+          googleCseConfigured: Boolean(GOOGLE_CSE_API_KEY && GOOGLE_CSE_ID),
+          pixabayConfigured: Boolean(PIXABAY_API_KEY),
+          pexelsConfigured: Boolean(PEXELS_API_KEY),
+          unsplashConfigured: Boolean(UNSPLASH_ACCESS_KEY),
+          sourceSites: RECIPE_IMAGE_SOURCE_SITES
+        }
       });
       return;
     }
@@ -31,6 +53,32 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson(req);
       const text = await callGemini(buildRecipePrompt(body));
       sendJson(res, 200, { text, provider: "gemini", model: GEMINI_MODEL });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/ai/related-recipes") {
+      const body = await readJson(req);
+      const payload = await callGeminiJsonPrompt(buildRelatedRecipesPrompt(body), 512, 0.35, false);
+      sendJson(res, 200, {
+        suggestions: normalizeRecipeSuggestions(payload.suggestions),
+        provider: "gemini",
+        model: GEMINI_MODEL
+      });
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/ai/import-recipe") {
+      const body = await readJson(req);
+      const payload = await callGeminiJsonPrompt(buildImportRecipePrompt(body), 1536, 0.2, true);
+      const recipe = normalizeGeneratedRecipe(payload.recipe || payload, body.recipeName);
+      if (!recipe.imageUrl) {
+        recipe.imageUrl = await findRecipeImageUrl(recipe, payload.recipe || payload);
+      }
+      sendJson(res, 200, {
+        recipe,
+        provider: "gemini",
+        model: GEMINI_MODEL
+      });
       return;
     }
 
@@ -79,7 +127,11 @@ const server = http.createServer(async (req, res) => {
 
     sendJson(res, 404, { error: "Not found" });
   } catch (error) {
-    sendJson(res, 500, { error: error.message || "Backend AI error" });
+    sendJson(res, error.statusCode || 500, {
+      error: error.code || "BACKEND_ERROR",
+      message: error.userMessage || error.message || "Backend AI error",
+      retryAfterSeconds: error.retryAfterSeconds || 0
+    });
   }
 });
 
@@ -188,7 +240,8 @@ async function callGeminiJson(parts) {
 
 async function callGeminiPayload(payload) {
   if (!GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is not configured on backend");
+    throw createBackendError(503, "GEMINI_NOT_CONFIGURED",
+      "Backend chưa cấu hình GEMINI_API_KEY.");
   }
   const response = await fetch(GEMINI_URL, {
     method: "POST",
@@ -201,9 +254,52 @@ async function callGeminiPayload(payload) {
 
   const payloadText = await response.text();
   if (!response.ok) {
-    throw new Error(`Gemini ${response.status}: ${payloadText}`);
+    throw createGeminiError(response.status, payloadText);
   }
   return JSON.parse(payloadText);
+}
+
+function createGeminiError(statusCode, payloadText) {
+  let payload = null;
+  try {
+    payload = JSON.parse(payloadText);
+  } catch (error) {
+    payload = null;
+  }
+  const message = payload?.error?.message || payloadText || "Gemini API error";
+  const status = payload?.error?.status || "";
+  const retryAfterSeconds = extractRetryAfterSeconds(payload);
+  if (statusCode === 429 || status === "RESOURCE_EXHAUSTED") {
+    return createBackendError(429, "GEMINI_QUOTA_EXCEEDED",
+      "Gemini đã hết hạn mức tạm thời. Hãy đợi"
+      + (retryAfterSeconds > 0 ? " khoảng " + retryAfterSeconds + " giây" : "")
+      + " rồi thử lại, hoặc đổi API key/gói quota trong backend.",
+      retryAfterSeconds);
+  }
+  return createBackendError(statusCode, status || "GEMINI_ERROR",
+    "Gemini đang lỗi: " + cleanText(message).slice(0, 220),
+    retryAfterSeconds);
+}
+
+function extractRetryAfterSeconds(payload) {
+  const details = Array.isArray(payload?.error?.details) ? payload.error.details : [];
+  for (const detail of details) {
+    const retryDelay = String(detail.retryDelay || "");
+    const match = retryDelay.match(/(\d+(?:\.\d+)?)s/);
+    if (match) {
+      return Math.max(1, Math.ceil(Number(match[1])));
+    }
+  }
+  return 0;
+}
+
+function createBackendError(statusCode, code, userMessage, retryAfterSeconds) {
+  const error = new Error(userMessage);
+  error.statusCode = statusCode;
+  error.code = code;
+  error.userMessage = userMessage;
+  error.retryAfterSeconds = retryAfterSeconds || 0;
+  return error;
 }
 
 async function callYoloDetector(body) {
@@ -240,6 +336,76 @@ async function callYoloDetector(body) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function callGeminiJsonPrompt(prompt, maxOutputTokens, temperature, useSearch) {
+  const request = {
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature,
+      maxOutputTokens,
+      responseMimeType: "application/json",
+      thinkingConfig: {
+        thinkingBudget: 0
+      }
+    }
+  };
+  if (useSearch) {
+    request.tools = [{ googleSearch: {} }];
+  }
+  try {
+    const payload = await callGeminiPayload(request);
+    return parseGeminiJsonPayload(payload);
+  } catch (error) {
+    if (!useSearch) {
+      throw error;
+    }
+    try {
+      const searchTextRequest = {
+        ...request,
+        generationConfig: {
+          ...request.generationConfig
+        }
+      };
+      delete searchTextRequest.generationConfig.responseMimeType;
+      const payload = await callGeminiPayload(searchTextRequest);
+      return parseGeminiJsonPayload(payload);
+    } catch (searchError) {
+      // Continue to a no-search JSON request so the app can still finish the flow.
+    }
+    const fallbackRequest = { ...request };
+    delete fallbackRequest.tools;
+    const payload = await callGeminiPayload(fallbackRequest);
+    return parseGeminiJsonPayload(payload);
+  }
+}
+
+function parseGeminiJsonPayload(payload) {
+  const text = payload.candidates?.[0]?.content?.parts
+    ?.map(part => part.text || "")
+    .join("")
+    .trim();
+  if (!text) {
+    throw new Error("Gemini returned empty JSON text");
+  }
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    const extracted = extractJsonObject(text);
+    if (extracted) {
+      return JSON.parse(extracted);
+    }
+    throw new Error(`Gemini JSON parse failed: ${text}`);
+  }
+}
+
+function extractJsonObject(text) {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) {
+    return "";
+  }
+  return text.slice(start, end + 1);
 }
 
 async function checkYoloHealth() {
@@ -292,6 +458,728 @@ function buildRecipePrompt(body) {
     `Các món app đã so khớp local: ${topMatches || "chưa có món phù hợp"}.`,
     "Hãy nêu món nên nấu trước, lý do ngắn, phần cần mua nếu matches có nêu, và một mẹo nhỏ."
   ].join(" ");
+}
+
+function buildRelatedRecipesPrompt(body) {
+  const dishName = String(body.dishName || "").trim();
+  const existingRecipeNames = Array.isArray(body.existingRecipeNames)
+    ? body.existingRecipeNames.filter(Boolean).slice(0, 80)
+    : [];
+  if (!dishName) {
+    throw new Error("dishName is required");
+  }
+  return [
+    "Bạn là AI Chef của app Sổ Tay Nấu Ăn AI.",
+    "Người dùng nhập tên món hoặc ý tưởng món ăn. Hãy tìm 5 món ăn liên quan nhất để người dùng chọn.",
+    "Ưu tiên món Việt Nam hoặc món phổ biến với gia đình Việt. Không trả món trùng chính xác với danh sách đã có nếu có lựa chọn gần hơn.",
+    "Trả JSON hợp lệ, không markdown, dạng {\"suggestions\":[{\"name\":\"...\",\"reason\":\"...\"}]} với đúng 5 phần tử.",
+    "Mỗi name là tên món ngắn, rõ ràng. reason tối đa 12 từ.",
+    `Tên người dùng nhập: ${dishName}.`,
+    `Tên món đã có trong app: ${existingRecipeNames.join(", ") || "chưa gửi"}.`
+  ].join(" ");
+}
+
+function buildImportRecipePrompt(body) {
+  const recipeName = String(body.recipeName || "").trim();
+  if (!recipeName) {
+    throw new Error("recipeName is required");
+  }
+  return [
+    "Bạn là AI Chef của app Sổ Tay Nấu Ăn AI.",
+    "Hãy dùng Google Search grounding nếu khả dụng để tham khảo các trang hướng dẫn nấu ăn đáng tin cậy, rồi tổng hợp một công thức thực hành được.",
+    "Không sao chép nguyên văn nội dung từ một trang. Chỉ tổng hợp công thức ngắn gọn, an toàn, dễ nấu tại nhà.",
+    "Trả JSON hợp lệ, không markdown, dạng {\"recipe\":{...}}.",
+    "recipe bắt buộc có đủ các trường: name, description, totalMinutes, difficulty, category, serving, calories, cost, ingredients, steps, imageSearchQuery, sourceRecipeUrls.",
+    "difficulty chỉ dùng một trong: Dễ, Trung bình, Khó.",
+    "category nên là một nhóm món thông dụng như Canh, Món kho, Món cơm, Món nước, Bún/Phở, Lẩu, Món chiên, Món xào, Món nướng, Món hấp, Món luộc, Gỏi & Salad, Món bánh, Tráng miệng, Nước uống, Món nhanh.",
+    "ingredients là mảng 8-16 dòng theo mẫu 'Tên nguyên liệu: số lượng đơn vị', ví dụ 'Thịt gà: 500 g'. Với gia vị dùng tiền tố 'Gia vị - ', ví dụ 'Gia vị - Nước mắm: 2 muỗng canh'.",
+    "steps là mảng 5-10 bước nấu rõ ràng, mỗi bước một câu.",
+    "calories dạng '520 kcal/phần' nếu ước lượng được; cost dạng '90.000đ' theo giá phổ thông Việt Nam; nếu không chắc vẫn đưa ước lượng hợp lý.",
+    "imageSearchQuery là cụm từ ngắn để tìm ảnh thật của món trên web, gồm tên tiếng Việt và nếu biết thì tên tiếng Anh, ví dụ 'khổ qua nhồi thịt Vietnamese stuffed bitter melon soup'.",
+    "sourceRecipeUrls là mảng URL trang công thức bạn đã tham khảo nếu có; ưu tiên trang có ảnh món thật và structured data Recipe.",
+    `Món cần tìm công thức: ${recipeName}.`
+  ].join(" ");
+}
+
+function normalizeRecipeSuggestions(rows) {
+  const source = Array.isArray(rows) ? rows : [];
+  const seen = new Set();
+  const suggestions = [];
+  for (const row of source) {
+    const name = cleanText(row && row.name);
+    if (!name) {
+      continue;
+    }
+    const key = name.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    suggestions.push({
+      name,
+      reason: cleanText(row && row.reason)
+    });
+    if (suggestions.length >= 5) {
+      break;
+    }
+  }
+  return suggestions;
+}
+
+function normalizeGeneratedRecipe(rawRecipe, fallbackName) {
+  const recipe = rawRecipe && typeof rawRecipe === "object" ? rawRecipe : {};
+  const ingredients = cleanStringArray(recipe.ingredients).slice(0, 18);
+  const steps = cleanStringArray(recipe.steps).slice(0, 12);
+  if (!ingredients.length || !steps.length) {
+    throw new Error("Gemini returned an incomplete recipe");
+  }
+  return {
+    name: cleanText(recipe.name) || cleanText(fallbackName),
+    description: cleanText(recipe.description) || "Công thức được AI tổng hợp từ các nguồn hướng dẫn nấu ăn.",
+    totalMinutes: clampInt(recipe.totalMinutes, 5, 240, 30),
+    difficulty: normalizeDifficulty(recipe.difficulty),
+    category: normalizeRecipeCategory(recipe, fallbackName),
+    serving: cleanText(recipe.serving) || "2 người",
+    calories: cleanText(recipe.calories) || "Ước lượng",
+    cost: cleanText(recipe.cost) || "Ước lượng",
+    imageUrl: isLikelyImageUrl(recipe.imageUrl) ? cleanText(recipe.imageUrl) : "",
+    imageSearchQuery: cleanText(recipe.imageSearchQuery),
+    sourceRecipeUrls: normalizeUrlList(recipe.sourceRecipeUrls || recipe.sourceUrls || recipe.sources),
+    imageSourceType: "",
+    imageSourceUrl: "",
+    imageAttribution: "",
+    imageConfidence: 0,
+    ingredients,
+    steps
+  };
+}
+
+async function findRecipeImageUrl(recipe, rawRecipe) {
+  const selected = await findRecipeImageCandidate(recipe, rawRecipe);
+  if (selected) {
+    recipe.imageSourceType = selected.sourceType;
+    recipe.imageSourceUrl = selected.sourceUrl;
+    recipe.imageAttribution = selected.attribution || "";
+    recipe.imageConfidence = selected.score;
+    return selected.url;
+  }
+  return "";
+}
+
+async function findRecipeImageCandidate(recipe, rawRecipe) {
+  const queries = buildImageQueries(recipe, rawRecipe);
+  const candidates = [];
+
+  const sourceUrls = collectSourceRecipeUrls(recipe, rawRecipe);
+  for (const sourceUrl of sourceUrls) {
+    candidates.push(...await findRecipePageImageCandidates(sourceUrl, recipe));
+  }
+
+  const googleRecipePages = await findRecipePagesViaGoogle(queries);
+  for (const sourceUrl of googleRecipePages) {
+    if (!sourceUrls.includes(sourceUrl)) {
+      candidates.push(...await findRecipePageImageCandidates(sourceUrl, recipe));
+    }
+  }
+
+  candidates.push(...await findGoogleImageCandidates(queries, recipe));
+  candidates.push(...await findPixabayImageCandidates(queries, recipe));
+  candidates.push(...await findPexelsImageCandidates(queries, recipe));
+  candidates.push(...await findUnsplashImageCandidates(queries, recipe));
+  candidates.push(...await findWikimediaImageCandidates(queries, recipe));
+
+  const best = chooseBestImageCandidate(candidates, recipe);
+  return best && best.score >= RECIPE_IMAGE_MIN_SCORE ? best : null;
+}
+
+function normalizeUrlList(values) {
+  const source = Array.isArray(values) ? values : values ? [values] : [];
+  const urls = [];
+  const seen = new Set();
+  for (const value of source) {
+    const url = cleanText(value);
+    if (!isHttpUrl(url) || seen.has(url)) {
+      continue;
+    }
+    seen.add(url);
+    urls.push(url);
+  }
+  return urls.slice(0, 8);
+}
+
+function collectSourceRecipeUrls(recipe, rawRecipe) {
+  const urls = [
+    ...normalizeUrlList(recipe.sourceRecipeUrls),
+    ...normalizeUrlList(rawRecipe && rawRecipe.sourceRecipeUrls),
+    ...normalizeUrlList(rawRecipe && rawRecipe.sourceUrls),
+    ...normalizeUrlList(rawRecipe && rawRecipe.sources),
+    ...normalizeUrlList(rawRecipe && rawRecipe.sourceRecipeUrl)
+  ];
+  const seen = new Set();
+  return urls.filter(url => {
+    if (seen.has(url)) {
+      return false;
+    }
+    seen.add(url);
+    return true;
+  }).slice(0, 10);
+}
+
+async function findRecipePageImageCandidates(sourceUrl, recipe) {
+  try {
+    const html = await fetchTextWithTimeout(sourceUrl, IMAGE_SEARCH_TIMEOUT_MS);
+    return extractImageCandidatesFromRecipePage(html, sourceUrl, recipe);
+  } catch (error) {
+    return [];
+  }
+}
+
+function extractImageCandidatesFromRecipePage(html, sourceUrl, recipe) {
+  const candidates = [];
+  for (const jsonText of extractJsonLdBlocks(html)) {
+    const payload = safeJsonParse(jsonText);
+    for (const node of flattenJsonLd(payload)) {
+      if (!isRecipeJsonLdNode(node)) {
+        continue;
+      }
+      for (const imageUrl of extractImageUrlsFromValue(node.image, sourceUrl)) {
+        candidates.push(imageCandidate(imageUrl, "recipe-jsonld", sourceUrl,
+          cleanText(node.name || recipe.name), 92));
+      }
+    }
+  }
+  for (const imageUrl of extractMetaImageUrls(html, sourceUrl)) {
+    candidates.push(imageCandidate(imageUrl, "recipe-meta", sourceUrl, "", 74));
+  }
+  return candidates;
+}
+
+function extractJsonLdBlocks(html) {
+  const blocks = [];
+  const regex = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match;
+  while ((match = regex.exec(html || "")) !== null) {
+    const text = decodeHtmlEntities(match[1]).trim();
+    if (text) {
+      blocks.push(text);
+    }
+  }
+  return blocks;
+}
+
+function safeJsonParse(text) {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    return null;
+  }
+}
+
+function flattenJsonLd(value) {
+  if (!value) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap(flattenJsonLd);
+  }
+  if (typeof value !== "object") {
+    return [];
+  }
+  const nodes = [value];
+  if (Array.isArray(value["@graph"])) {
+    nodes.push(...value["@graph"].flatMap(flattenJsonLd));
+  }
+  return nodes;
+}
+
+function isRecipeJsonLdNode(node) {
+  const type = node && node["@type"];
+  const types = Array.isArray(type) ? type : [type];
+  return types.some(item => String(item || "").toLowerCase() === "recipe");
+}
+
+function extractImageUrlsFromValue(value, baseUrl) {
+  const urls = [];
+  if (!value) {
+    return urls;
+  }
+  if (typeof value === "string") {
+    urls.push(resolveUrl(value, baseUrl));
+  } else if (Array.isArray(value)) {
+    for (const item of value) {
+      urls.push(...extractImageUrlsFromValue(item, baseUrl));
+    }
+  } else if (typeof value === "object") {
+    urls.push(...extractImageUrlsFromValue(value.url || value.contentUrl || value["@id"], baseUrl));
+  }
+  return urls.filter(isLikelyImageUrl);
+}
+
+function extractMetaImageUrls(html, baseUrl) {
+  const urls = [];
+  const regex = /<meta\s+[^>]*(?:property|name)=["'](?:og:image|twitter:image|image)["'][^>]*>/gi;
+  let match;
+  while ((match = regex.exec(html || "")) !== null) {
+    const contentMatch = match[0].match(/\scontent=["']([^"']+)["']/i);
+    if (contentMatch) {
+      const url = resolveUrl(decodeHtmlEntities(contentMatch[1]), baseUrl);
+      if (isLikelyImageUrl(url)) {
+        urls.push(url);
+      }
+    }
+  }
+  return urls;
+}
+
+async function findRecipePagesViaGoogle(queries) {
+  if (!GOOGLE_CSE_API_KEY || !GOOGLE_CSE_ID) {
+    return [];
+  }
+  const urls = [];
+  const seen = new Set();
+  for (const query of queries) {
+    const siteQuery = RECIPE_IMAGE_SOURCE_SITES.length
+      ? `(${RECIPE_IMAGE_SOURCE_SITES.map(site => `site:${site}`).join(" OR ")})`
+      : "";
+    const searchQuery = `${query} cách nấu công thức ${siteQuery}`.trim();
+    const apiUrl = "https://www.googleapis.com/customsearch/v1?"
+      + `key=${encodeURIComponent(GOOGLE_CSE_API_KEY)}`
+      + `&cx=${encodeURIComponent(GOOGLE_CSE_ID)}`
+      + `&num=5&safe=active&hl=vi&q=${encodeURIComponent(searchQuery)}`;
+    try {
+      const payload = await fetchJsonWithTimeout(apiUrl, IMAGE_SEARCH_TIMEOUT_MS);
+      for (const item of payload.items || []) {
+        const url = cleanText(item.link);
+        if (isHttpUrl(url) && !seen.has(url)) {
+          seen.add(url);
+          urls.push(url);
+        }
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+  return urls.slice(0, 12);
+}
+
+async function findGoogleImageCandidates(queries, recipe) {
+  if (!GOOGLE_CSE_API_KEY || !GOOGLE_CSE_ID) {
+    return [];
+  }
+  const candidates = [];
+  for (const query of queries.slice(0, 4)) {
+    const apiUrl = "https://www.googleapis.com/customsearch/v1?"
+      + `key=${encodeURIComponent(GOOGLE_CSE_API_KEY)}`
+      + `&cx=${encodeURIComponent(GOOGLE_CSE_ID)}`
+      + "&searchType=image&imgType=photo&imgSize=large&safe=active&num=8"
+      + `&hl=vi&q=${encodeURIComponent(query + " món ăn")}`;
+    try {
+      const payload = await fetchJsonWithTimeout(apiUrl, IMAGE_SEARCH_TIMEOUT_MS);
+      for (const item of payload.items || []) {
+        candidates.push(imageCandidate(item.link, "google-cse-image",
+          item.image?.contextLink || item.link, cleanText(item.title || recipe.name), 72));
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+  return candidates;
+}
+
+async function findPixabayImageCandidates(queries, recipe) {
+  if (!PIXABAY_API_KEY) {
+    return [];
+  }
+  const candidates = [];
+  for (const query of queries.slice(0, 3)) {
+    const apiUrl = "https://pixabay.com/api/?"
+      + `key=${encodeURIComponent(PIXABAY_API_KEY)}`
+      + `&q=${encodeURIComponent(query)}&lang=vi&image_type=photo&category=food`
+      + "&safesearch=true&orientation=horizontal&per_page=8";
+    try {
+      const payload = await fetchJsonWithTimeout(apiUrl, IMAGE_SEARCH_TIMEOUT_MS);
+      for (const hit of payload.hits || []) {
+        candidates.push(imageCandidate(hit.webformatURL || hit.largeImageURL,
+          "pixabay", hit.pageURL, cleanText(hit.tags || recipe.name), 58,
+          "Pixabay"));
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+  return candidates;
+}
+
+async function findPexelsImageCandidates(queries, recipe) {
+  if (!PEXELS_API_KEY) {
+    return [];
+  }
+  const candidates = [];
+  for (const query of queries.slice(0, 3)) {
+    const apiUrl = "https://api.pexels.com/v1/search?"
+      + `query=${encodeURIComponent(query)}&locale=vi-VN&orientation=landscape&per_page=8`;
+    try {
+      const payload = await fetchJsonWithHeaders(apiUrl, {
+        "Authorization": PEXELS_API_KEY
+      }, IMAGE_SEARCH_TIMEOUT_MS);
+      for (const photo of payload.photos || []) {
+        candidates.push(imageCandidate(photo.src?.large || photo.src?.medium,
+          "pexels", photo.url, cleanText(photo.alt || recipe.name), 56,
+          photo.photographer ? `Photo by ${photo.photographer} on Pexels` : "Pexels"));
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+  return candidates;
+}
+
+async function findUnsplashImageCandidates(queries, recipe) {
+  if (!UNSPLASH_ACCESS_KEY) {
+    return [];
+  }
+  const candidates = [];
+  for (const query of queries.slice(0, 3)) {
+    const apiUrl = "https://api.unsplash.com/search/photos?"
+      + `query=${encodeURIComponent(query + " food")}&orientation=landscape&per_page=8`;
+    try {
+      const payload = await fetchJsonWithHeaders(apiUrl, {
+        "Authorization": `Client-ID ${UNSPLASH_ACCESS_KEY}`
+      }, IMAGE_SEARCH_TIMEOUT_MS);
+      for (const photo of payload.results || []) {
+        candidates.push(imageCandidate(photo.urls?.regular || photo.urls?.small,
+          "unsplash", photo.links?.html || "", cleanText(photo.alt_description || recipe.name), 54,
+          photo.user?.name ? `Photo by ${photo.user.name} on Unsplash` : "Unsplash"));
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+  return candidates;
+}
+
+async function findWikimediaImageCandidates(queries, recipe) {
+  const candidates = [];
+  for (const query of queries) {
+    candidates.push(...await findWikimediaSearchCandidates(query, recipe));
+  }
+  for (const query of queries) {
+    const vi = await findWikipediaSummaryCandidate(query, "vi", recipe);
+    if (vi) {
+      candidates.push(vi);
+    }
+  }
+  for (const query of queries) {
+    const en = await findWikipediaSummaryCandidate(query, "en", recipe);
+    if (en) {
+      candidates.push(en);
+    }
+  }
+  return candidates;
+}
+
+function buildImageQueries(recipe, rawRecipe) {
+  const values = [
+    cleanText(recipe.imageSearchQuery),
+    cleanText(rawRecipe && rawRecipe.imageSearchQuery),
+    cleanText(recipe.name),
+    `${cleanText(recipe.name)} Vietnamese food`,
+    `${cleanText(recipe.name)} món ăn Việt Nam`,
+    `${cleanText(recipe.category)} ${cleanText(recipe.name)}`
+  ];
+  const seen = new Set();
+  const queries = [];
+  for (const value of values) {
+    const query = value.replace(/\s+/g, " ").trim();
+    const key = removeVietnameseTone(query);
+    if (!query || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    queries.push(query);
+  }
+  return queries.slice(0, 6);
+}
+
+async function findWikimediaSearchCandidates(query, recipe) {
+  const apiUrl = "https://commons.wikimedia.org/w/api.php?"
+    + "action=query&generator=search&gsrnamespace=6&gsrlimit=8"
+    + "&prop=imageinfo&iiprop=url|mime&iiurlwidth=1200&format=json&origin=*"
+    + `&gsrsearch=${encodeURIComponent(query)}`;
+  try {
+    const payload = await fetchJsonWithTimeout(apiUrl, IMAGE_SEARCH_TIMEOUT_MS);
+    const pages = Object.values(payload.query?.pages || {});
+    const candidates = [];
+    for (const page of pages) {
+      const imageInfo = page.imageinfo && page.imageinfo[0];
+      if (!imageInfo || !String(imageInfo.mime || "").startsWith("image/")) {
+        continue;
+      }
+      const imageUrl = cleanText(imageInfo.thumburl || imageInfo.url);
+      if (isLikelyImageUrl(imageUrl)) {
+        candidates.push(imageCandidate(imageUrl, "wikimedia",
+          imageInfo.descriptionurl || "https://commons.wikimedia.org",
+          cleanText(page.title || recipe.name), 64, "Wikimedia Commons"));
+      }
+    }
+    return candidates;
+  } catch (error) {
+    return [];
+  }
+}
+
+async function findWikipediaSummaryCandidate(query, language, recipe) {
+  const title = encodeURIComponent(query.replace(/\s+/g, "_"));
+  const apiUrl = `https://${language}.wikipedia.org/api/rest_v1/page/summary/${title}`;
+  try {
+    const payload = await fetchJsonWithTimeout(apiUrl, IMAGE_SEARCH_TIMEOUT_MS);
+    const imageUrl = cleanText(payload.originalimage?.source || payload.thumbnail?.source);
+    if (!isLikelyImageUrl(imageUrl)) {
+      return null;
+    }
+    return imageCandidate(imageUrl, `wikipedia-${language}`,
+      payload.content_urls?.desktop?.page || apiUrl,
+      cleanText(payload.title || recipe.name), 62, "Wikipedia");
+  } catch (error) {
+    return null;
+  }
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs) {
+  return fetchJsonWithHeaders(url, {}, timeoutMs);
+}
+
+async function fetchJsonWithHeaders(url, headers, timeoutMs) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "SoTayNauAnAI/1.0 recipe-image-fetcher",
+        ...headers
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`Image search ${response.status}`);
+    }
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchTextWithTimeout(url, timeoutMs) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "Accept": "text/html,application/xhtml+xml",
+        "User-Agent": "SoTayNauAnAI/1.0 recipe-image-fetcher"
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`Recipe page ${response.status}`);
+    }
+    return await response.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function imageCandidate(url, sourceType, sourceUrl, label, baseScore, attribution) {
+  const imageUrl = cleanText(url);
+  if (!isLikelyImageUrl(imageUrl)) {
+    return null;
+  }
+  return {
+    url: imageUrl,
+    sourceType: cleanText(sourceType),
+    sourceUrl: cleanText(sourceUrl),
+    label: cleanText(label),
+    baseScore,
+    attribution: cleanText(attribution),
+    score: 0
+  };
+}
+
+function chooseBestImageCandidate(candidates, recipe) {
+  const unique = [];
+  const seen = new Set();
+  for (const candidate of candidates) {
+    if (!candidate || !candidate.url || seen.has(candidate.url)) {
+      continue;
+    }
+    seen.add(candidate.url);
+    candidate.score = scoreImageCandidate(candidate, recipe);
+    unique.push(candidate);
+  }
+  unique.sort((left, right) => right.score - left.score);
+  return unique[0] || null;
+}
+
+function scoreImageCandidate(candidate, recipe) {
+  let score = Number(candidate.baseScore) || 0;
+  const haystack = removeVietnameseTone([
+    candidate.label,
+    candidate.url,
+    candidate.sourceUrl
+  ].join(" "));
+  const recipeName = removeVietnameseTone(recipe.name);
+  const category = removeVietnameseTone(recipe.category);
+  const query = removeVietnameseTone(recipe.imageSearchQuery);
+  if (recipeName && haystack.includes(recipeName)) {
+    score += 22;
+  }
+  if (category && haystack.includes(category)) {
+    score += 8;
+  }
+  for (const token of importantFoodTokens(`${recipe.name} ${recipe.imageSearchQuery}`)) {
+    if (haystack.includes(token)) {
+      score += 5;
+    }
+  }
+  if (query && haystack.includes(query)) {
+    score += 10;
+  }
+  if (candidate.sourceType === "recipe-jsonld") {
+    score += 18;
+  }
+  if (candidate.sourceType === "recipe-meta") {
+    score += 8;
+  }
+  if (/logo|avatar|icon|placeholder|banner|cover|sprite/.test(haystack)) {
+    score -= 45;
+  }
+  if (/upload\.wikimedia\.org|cooky|dienmayxanh|bachhoaxanh|thatlangon|ngonaz/.test(haystack)) {
+    score += 5;
+  }
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+function importantFoodTokens(value) {
+  const stopWords = new Set(["mon", "an", "viet", "nam", "food", "vietnamese", "cach", "nau", "cong", "thuc"]);
+  return removeVietnameseTone(value)
+    .split(/[^a-z0-9]+/)
+    .filter(token => token.length >= 3 && !stopWords.has(token))
+    .slice(0, 8);
+}
+
+function resolveUrl(value, baseUrl) {
+  try {
+    return new URL(cleanText(value), baseUrl).toString();
+  } catch (error) {
+    return "";
+  }
+}
+
+function isHttpUrl(value) {
+  return /^https?:\/\//i.test(cleanText(value));
+}
+
+function decodeHtmlEntities(value) {
+  return String(value || "")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#34;/g, "\"")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#39;/g, "'");
+}
+
+function isLikelyImageUrl(value) {
+  const imageUrl = cleanText(value);
+  if (!/^https?:\/\//i.test(imageUrl)) {
+    return false;
+  }
+  if (/\.(html?|php|aspx?)(\?|$)/i.test(imageUrl)) {
+    return false;
+  }
+  return /\.(png|jpe?g|webp|avif)(\?|$)/i.test(imageUrl)
+    || imageUrl.includes("upload.wikimedia.org/")
+    || imageUrl.includes("images.pexels.com/")
+    || imageUrl.includes("images.unsplash.com/")
+    || imageUrl.includes("pixabay.com/")
+    || /\/(image|images|photo|photos|media|uploads|cdn)\//i.test(imageUrl)
+    || imageUrl.includes("=image")
+    || imageUrl.includes("format=");
+}
+
+function normalizeDifficulty(value) {
+  const text = cleanText(value).toLowerCase();
+  if (text.includes("khó")) {
+    return "Khó";
+  }
+  if (text.includes("dễ")) {
+    return "Dễ";
+  }
+  return "Trung bình";
+}
+
+function normalizeRecipeCategory(recipe, fallbackName) {
+  const rawCategory = cleanText(recipe.category);
+  if (rawCategory && rawCategory !== "Công thức của tôi" && rawCategory !== "Món khác") {
+    return rawCategory;
+  }
+  const text = removeVietnameseTone([
+    fallbackName,
+    recipe.name,
+    recipe.description,
+    ...(Array.isArray(recipe.ingredients) ? recipe.ingredients : [])
+  ].join(" "));
+  if (containsAnyText(text, "canh", "kho qua nhoi thit")) return "Canh";
+  if (containsAnyText(text, "lau")) return "Lẩu";
+  if (containsAnyText(text, "kho", "rim")) return "Món kho";
+  if (containsAnyText(text, "xao")) return "Món xào";
+  if (containsAnyText(text, "chien", "ran")) return "Món chiên";
+  if (containsAnyText(text, "nuong")) return "Món nướng";
+  if (containsAnyText(text, "hap")) return "Món hấp";
+  if (containsAnyText(text, "luoc")) return "Món luộc";
+  if (containsAnyText(text, "bun", "pho", "hu tieu", "mi quang")) return "Bún/Phở";
+  if (containsAnyText(text, "com")) return "Món cơm";
+  if (containsAnyText(text, "goi", "salad")) return "Gỏi & Salad";
+  if (containsAnyText(text, "banh")) return "Món bánh";
+  if (containsAnyText(text, "che", "flan")) return "Tráng miệng";
+  if (containsAnyText(text, "sinh to", "ca phe", "nuoc cam")) return "Nước uống";
+  return "Món gia đình";
+}
+
+function containsAnyText(value, ...needles) {
+  return needles.some(needle => value.includes(needle));
+}
+
+function removeVietnameseTone(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanStringArray(rows) {
+  const source = Array.isArray(rows) ? rows : [];
+  const values = [];
+  for (const row of source) {
+    const value = cleanText(row);
+    if (value) {
+      values.push(value);
+    }
+  }
+  return values;
+}
+
+function clampInt(value, min, max, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, parsed));
 }
 
 function buildIngredientDetectionParts(body) {

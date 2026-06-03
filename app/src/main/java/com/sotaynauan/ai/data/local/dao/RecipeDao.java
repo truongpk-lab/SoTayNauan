@@ -28,6 +28,9 @@ public interface RecipeDao {
     @Query("SELECT * FROM recipes WHERE name = :name LIMIT 1")
     RecipeEntity findByName(String name);
 
+    @Query("SELECT * FROM recipes WHERE lower(trim(name)) = lower(trim(:name)) LIMIT 1")
+    RecipeEntity findByNormalizedName(String name);
+
     @Query("SELECT * FROM recipes WHERE todaySuggestion = 1 ORDER BY popularityScore DESC")
     List<RecipeEntity> getTodaySuggestions();
 
@@ -37,7 +40,7 @@ public interface RecipeDao {
     @Query("SELECT * FROM recipes ORDER BY popularityScore DESC")
     List<RecipeEntity> getAllRecipes();
 
-    @Query("SELECT * FROM recipes WHERE category = 'Công thức của tôi' ORDER BY id DESC")
+    @Query("SELECT * FROM recipes WHERE category = 'Công thức của tôi' OR (todaySuggestion = 0 AND friendNote = '') ORDER BY id DESC")
     List<RecipeEntity> getUserSavedRecipes();
 
     @Query("SELECT * FROM recipes WHERE friendNote != '' ORDER BY popularityScore DESC")
