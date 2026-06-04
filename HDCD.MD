@@ -2,6 +2,8 @@
 
 Tai lieu nay danh cho may moi vua clone repo `SoTayNauAn`. Lam theo cac buoc ben duoi de co moi truong giong may phat trien: Android app, AI backend Node va YOLO detector local.
 
+Luu y quan trong: backend Node, YOLO detector, requirements va model baseline da nam trong repo nay. May khac pull ve khong can clone/copy them backend hoac YOLO rieng. Thu can co san tren may la Android Studio/SDK, Node.js, Python va ket noi internet cho lan dau YOLO cai Python packages.
+
 ## 1. Phan mem can cai
 
 - Git for Windows.
@@ -31,9 +33,17 @@ Sau khi pull, can co cac file/thu muc chinh:
 ```text
 app\
 backend\
+backend\server.js
+backend\run_backend.bat
+backend\.env.example
+backend\yolo_detector\app.py
+backend\yolo_detector\run_yolo_detector.bat
+backend\yolo_detector\requirements.txt
 backend\yolo_detector\models\original_yolov8s\model.pt
 gradlew.bat
 run_app.bat
+run_backend.bat
+run_yolo_detector.bat
 README.md
 HDCD.MD
 ```
@@ -71,7 +81,10 @@ set LAN_BACKEND_URL=http://192.168.1.25:8787
 
 ## 5. Tao cau hinh backend
 
-Backend Node doc cau hinh tu `backend\.env`. File nay khong commit de tranh lo API key. Tren may moi, tao tu template:
+Backend Node doc cau hinh tu `backend\.env`. File nay khong commit de tranh lo API key. Tren may moi, co 2 cach:
+
+- Cach de nhat: chay `.\run_backend.bat`; script tu copy `backend\.env.example` thanh `backend\.env` neu chua co.
+- Cach thu cong: tao file tu template:
 
     cd D:\SoTayNauAn\backend
     copy .env.example .env
@@ -91,6 +104,8 @@ Neu chua co Gemini key, backend van chay va detector YOLO van hoat dong, nhung c
 
 Cong dong bep nha LAN cung chay tren backend Node port `8787`. Backend se tu tao `backend\data\community.json` de luu loi moi ket ban QR, ban be, chia se cong thuc, like, luu mon va binh luan. File nay la du lieu runtime local cua may chay backend, khong commit len git.
 
+Backend hien dung Node built-in modules trong `backend\server.js`, nen khong can `npm install` de chay ban hien tai. Neu sau nay them dependencies vao `backend\package.json`, chay `npm install` trong thu muc `backend` truoc khi mo backend.
+
 ## 6. Cai va chay bang 3 terminal
 
 Mo 3 terminal rieng biet tai Windows. Hay de Terminal 1 va Terminal 2 tiep tuc chay, sau do moi chay Terminal 3.
@@ -101,7 +116,7 @@ Terminal 1 - chay YOLO detector:
     cd D:\SoTayNauAn
     .\run_yolo_detector.bat
 
-Lan dau script se tao `.venv`, cai Python packages tu `requirements.txt`, nap model `models\original_yolov8s\model.pt` va chay service tai:
+Lan dau script se vao `backend\yolo_detector`, tao `.venv`, cai Python packages tu `requirements.txt`, nap model `models\original_yolov8s\model.pt` co san trong repo va chay service tai:
 
 ```text
 http://127.0.0.1:8790
@@ -112,7 +127,7 @@ Terminal 2 - chay AI backend Node:
     cd D:\SoTayNauAn
     .\run_backend.bat
 
-Backend chay tai:
+Lan dau script se vao `backend`, tao `backend\.env` tu `.env.example` neu chua co, bo sung cau hinh YOLO mac dinh neu thieu, va chay backend tai:
 
 ```text
 http://127.0.0.1:8787
@@ -123,7 +138,15 @@ Terminal 3 - build, cai va mo app:
     cd D:\SoTayNauAn
     .\run_app.bat
 
-`run_app.bat` se kiem tra backend `/health`, chon thiet bi/emulator, build debug APK, cai APK va mo app `com.sotaynauan.ai`.
+`run_app.bat` se kiem tra backend `/health` va yeu cau `yoloReady=true`, chon thiet bi/emulator, build debug APK, cai APK va mo app `com.sotaynauan.ai`. Script nay khong tu bat Terminal 1/2; neu backend hoac YOLO chua chay, hay mo Terminal 1 va Terminal 2 nhu tren truoc.
+
+Thu tu bat buoc tren may moi:
+
+```text
+1. .\run_yolo_detector.bat  -> giu terminal nay mo
+2. .\run_backend.bat        -> giu terminal nay mo
+3. .\run_app.bat            -> build/cai/mo Android app
+```
 
 ## 7. Du lieu local va DB nguyen lieu
 

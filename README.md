@@ -4,7 +4,7 @@ Ung dung Android goi y mon an, quan ly cong thuc, danh sach mua sam, che do nau 
 
 ## Cai moi tren may khac
 
-Xem day du trong [HDCD.MD](HDCD.MD). Tom tat moi truong can co:
+Xem day du trong [HDCD.MD](HDCD.MD). Repo da co san Android app, backend Node, YOLO detector va model baseline. May khac pull ve khong can lay them repo backend/YOLO rieng, chi can cai dung phan mem nen:
 
 - Android Studio + Android SDK Platform/Build-Tools/Platform-Tools/Emulator.
 - Node.js LTS tu 18 tro len.
@@ -17,12 +17,12 @@ Sau khi clone/pull, Android Studio se tao `local.properties` theo may. Neu can t
 sdk.dir=C\:\\Users\\<TEN_USER>\\AppData\\Local\\Android\\Sdk
 ```
 
-Backend dung file rieng `backend\.env` va khong commit API key. Tao tu template trong PowerShell/CMD:
+Backend dung file rieng `backend\.env` va khong commit API key. Khi chay `.\run_backend.bat`, script se tu tao `backend\.env` tu `backend\.env.example` neu file nay chua ton tai. Neu muon tao/sua thu cong:
 
     cd D:\SoTayNauAn\backend
     copy .env.example .env
 
-Neu can day du chuc nang Gemini/voice, dien `GEMINI_API_KEY` trong `backend\.env`. Cac bien YOLO mac dinh:
+Neu can day du chuc nang Gemini/voice, dien `GEMINI_API_KEY` trong `backend\.env`. Neu chua dien key, backend van chay, cong dong LAN va YOLO van dung duoc; cac tinh nang goi Gemini se bao thieu key. Cac bien YOLO mac dinh:
 
 ```env
 YOLO_DETECT_URL=http://127.0.0.1:8790/detect
@@ -47,7 +47,7 @@ Thu tu uu tien anh: anh trong JSON-LD `schema.org/Recipe` cua trang cong thuc, O
 
 ## Khoi chay moi bang 3 terminal
 
-Mo 3 terminal Windows rieng biet. De Terminal 1 va Terminal 2 tiep tuc chay, roi chay Terminal 3.
+Sau khi clone/pull tren may khac, mo 3 terminal Windows rieng biet. De Terminal 1 va Terminal 2 tiep tuc chay, roi chay Terminal 3.
 Neu PowerShell hien dau nhac `>>` sau khi lo copy ba dau backtick tu Markdown, bam `Ctrl+C` de thoat ve `PS D:\SoTayNauAn>`.
 
 Terminal 1 - YOLO detector:
@@ -55,17 +55,21 @@ Terminal 1 - YOLO detector:
     cd D:\SoTayNauAn
     .\run_yolo_detector.bat
 
+Lan dau chay, script tu tao `backend\yolo_detector\.venv`, cai Python packages tu `backend\yolo_detector\requirements.txt`, nap model co san `backend\yolo_detector\models\original_yolov8s\model.pt`, roi mo service port `8790`.
+
 Terminal 2 - AI backend Node:
 
     cd D:\SoTayNauAn
     .\run_backend.bat
+
+Lan dau chay, script tu tao `backend\.env` tu `.env.example` neu chua co, cau hinh mac dinh de backend goi YOLO tai `http://127.0.0.1:8790/detect`, roi mo service port `8787`.
 
 Terminal 3 - build, cai va mo app Android:
 
     cd D:\SoTayNauAn
     .\run_app.bat
 
-`run_app.bat` se kiem tra backend va YOLO qua `/health`, uu tien dien thoai that neu co, tu mo emulator neu can, build debug APK, cai APK va mo app. Khi cai tren dien thoai that, script se build app voi IP LAN cua may PC chay backend de cac dien thoai/tai khoan cung Wi-Fi co the dung chung cong dong bep nha.
+`run_app.bat` khong tu bat backend/YOLO; no se kiem tra backend va YOLO qua `/health`, uu tien dien thoai that neu co, tu mo emulator neu can, build debug APK, cai APK va mo app. Khi cai tren dien thoai that, script se build app voi IP LAN cua may PC chay backend de cac dien thoai/tai khoan cung Wi-Fi co the dung chung cong dong bep nha.
 
 ## Endpoint local
 
