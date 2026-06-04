@@ -175,10 +175,10 @@ if errorlevel 1 (
 exit /b 0
 
 :wait_android_ready
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$adb = $env:ADB; $serial = $env:TARGET_DEVICE; $deadline = (Get-Date).AddMinutes(6); $last = ''; while ((Get-Date) -lt $deadline) { try { & $adb -s $serial wait-for-device | Out-Null; $sys = (& $adb -s $serial shell getprop sys.boot_completed 2>$null | Out-String).Trim(); $dev = (& $adb -s $serial shell getprop dev.bootcomplete 2>$null | Out-String).Trim(); $anim = (& $adb -s $serial shell getprop init.svc.bootanim 2>$null | Out-String).Trim(); $pm = (& $adb -s $serial shell cmd package list packages android 2>$null | Out-String).Trim(); $last = ('sys=' + $sys + ' dev=' + $dev + ' anim=' + $anim + ' pm=' + (($pm.Length -gt 0))); if ($sys -eq '1' -and ($dev -eq '1' -or $anim -eq 'stopped') -and $pm.Length -gt 0) { Write-Host ('Android ready: ' + $last); exit 0 }; Write-Host ('Waiting Android boot: ' + $last) } catch { $last = $_.Exception.Message; Write-Host ('Waiting Android boot: ' + $last) }; Start-Sleep -Seconds 3 }; Write-Host ('Android boot timeout. Last status: ' + $last); exit 1"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$adb = $env:ADB; $serial = $env:TARGET_DEVICE; $deadline = (Get-Date).AddSeconds(120); $last = ''; while ((Get-Date) -lt $deadline) { try { $sys = (& $adb -s $serial shell getprop sys.boot_completed 2>$null | Out-String).Trim(); $dev = (& $adb -s $serial shell getprop dev.bootcomplete 2>$null | Out-String).Trim(); $anim = (& $adb -s $serial shell getprop init.svc.bootanim 2>$null | Out-String).Trim(); $last = ('sys=' + $sys + ' dev=' + $dev + ' anim=' + $anim); if ($sys -eq '1' -and ($dev -eq '1' -or $anim -eq 'stopped')) { Write-Host ('Android ready: ' + $last); exit 0 }; Write-Host ('Waiting Android boot: ' + $last) } catch { $last = $_.Exception.Message; Write-Host ('Waiting Android boot: ' + $last) }; Start-Sleep -Seconds 3 }; Write-Host ('Android boot timeout. Last status: ' + $last); exit 1"
 if errorlevel 1 (
     echo Thiet bi/emulator chua san sang sau thoi gian cho.
-    echo Goi y: neu emulator bi treo, dong emulator va chay lai .\run_app.bat.
+    echo Goi y: neu emulator bi treo, dong emulator va chay lai .\run_app.bat, hoac mo Android Studio Device Manager va chon Cold Boot/Wipe Data cho AVD.
     exit /b 1
 )
 exit /b 0

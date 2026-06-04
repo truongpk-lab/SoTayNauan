@@ -31,13 +31,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 public class CommunityRemoteDataSource {
-    private static final int CONNECT_TIMEOUT_MS = 3500;
-    private static final int READ_TIMEOUT_MS = 5000;
+    private static final int CONNECT_TIMEOUT_MS = 800;
+    private static final int READ_TIMEOUT_MS = 1400;
+    private static final long RETRY_BACKOFF_MS = 15000L;
 
     private final String baseUrl;
     private final String userId;
     private final String displayName;
     private final String email;
+    private long unavailableUntilMillis;
 
     public CommunityRemoteDataSource(String baseUrl, String userId, String displayName, String email) {
         String safeBaseUrl = baseUrl == null ? "" : baseUrl.trim();
@@ -128,12 +130,16 @@ public class CommunityRemoteDataSource {
         if (!isConfigured()) {
             throw new IOException("Community backend chưa được cấu hình.");
         }
+        if (System.currentTimeMillis() < unavailableUntilMillis) {
+            throw new IOException("Community backend đang tạm bỏ qua để giữ UI mượt.");
+        }
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Future<JSONObject> future = executor.submit(callable);
         try {
-            return future.get(READ_TIMEOUT_MS + 1000L, TimeUnit.MILLISECONDS);
+            return future.get(READ_TIMEOUT_MS + 500L, TimeUnit.MILLISECONDS);
         } catch (TimeoutException exception) {
             future.cancel(true);
+            markBackendUnavailable();
             throw new IOException("Community backend phản hồi quá chậm.");
         } catch (ExecutionException exception) {
             Throwable cause = exception.getCause();
@@ -141,15 +147,22 @@ public class CommunityRemoteDataSource {
                 throw (JSONException) cause;
             }
             if (cause instanceof IOException) {
+                markBackendUnavailable();
                 throw (IOException) cause;
             }
+            markBackendUnavailable();
             throw new IOException(cause == null ? "Community backend lỗi." : cause.getMessage());
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
+            markBackendUnavailable();
             throw new IOException("Đã hủy kết nối community backend.");
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    private void markBackendUnavailable() {
+        unavailableUntilMillis = System.currentTimeMillis() + RETRY_BACKOFF_MS;
     }
 
     private JSONObject getJson(String path) throws IOException, JSONException {
