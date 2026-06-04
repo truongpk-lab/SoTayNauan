@@ -30,6 +30,17 @@ YOLO_TIMEOUT_MS=20000
 YOLO_MODEL_ID=original_yolov8s
 ```
 
+Dang ky tai khoan co buoc gui OTP ve email. De gui qua Gmail that, dien SMTP trong `backend\.env`, sau do tat Terminal 2 va chay lai `.\run_backend.bat`. `SMTP_PASS` phai la Gmail App Password sau khi bat 2-Step Verification, khong dung mat khau dang nhap Gmail thuong:
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=yourgmail@gmail.com
+SMTP_PASS=your_gmail_app_password
+SMTP_FROM=yourgmail@gmail.com
+```
+
 Anh mon an cho cong thuc AI co pipeline nhieu tang. Neu khong dien key, backend van co gang lay anh tu structured data cua trang cong thuc va Wikimedia/Wikipedia. De tang ti le dung anh mon that, co the dien them:
 
 ```env

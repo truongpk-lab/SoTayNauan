@@ -28,6 +28,14 @@ public class AuthFormAdapter {
         return emailInput.getText().toString();
     }
 
+    public void clearInputs() {
+        emailInput.setText("");
+        passwordInput.setText("");
+        emailInput.setError(null);
+        passwordInput.setError(null);
+        emailInput.requestFocus();
+    }
+
     public void bindResult(AuthResult result) {
         statusText.setText(result.getMessage());
         statusText.setSelected(result.isSuccess());

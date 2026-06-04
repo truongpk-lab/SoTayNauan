@@ -1,4 +1,6 @@
 const http = require("http");
+const net = require("net");
+const tls = require("tls");
 const fs = require("fs");
 const path = require("path");
 
@@ -27,6 +29,12 @@ const RECIPE_IMAGE_SOURCE_SITES = (process.env.RECIPE_IMAGE_SOURCE_SITES || [
 ].join(",")).split(",").map(value => value.trim()).filter(Boolean);
 const COMMUNITY_DATA_FILE = process.env.COMMUNITY_DATA_FILE
   || path.join(__dirname, "data", "community.json");
+const SMTP_HOST = process.env.SMTP_HOST || "";
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_SECURE = String(process.env.SMTP_SECURE || "").toLowerCase() === "true";
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER || "no-reply@sotaynauan.local";
 
 const server = http.createServer(async (req, res) => {
   try {
@@ -53,6 +61,13 @@ const server = http.createServer(async (req, res) => {
 
     if (req.url.startsWith("/api/community/")) {
       await handleCommunityRequest(req, res);
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/api/auth/send-otp") {
+      const body = await readJson(req);
+      await handleSendOtp(body);
+      sendJson(res, 200, { ok: true, message: "OTP sent" });
       return;
     }
 
@@ -196,6 +211,151 @@ function readJson(req) {
     });
     req.on("error", reject);
   });
+}
+
+async function handleSendOtp(body) {
+  const email = cleanText(body.email).toLowerCase();
+  const otp = cleanText(body.otp);
+  if (!isValidEmailAddress(email)) {
+    throw createBackendError(400, "INVALID_EMAIL",
+      "Email chưa đúng cấu trúc. Hãy nhập dạng ten@example.com.");
+  }
+  if (!/^\d{6}$/.test(otp)) {
+    throw createBackendError(400, "INVALID_OTP", "Mã OTP phải gồm 6 chữ số.");
+  }
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    throw createBackendError(503, "SMTP_NOT_CONFIGURED",
+      "Backend chưa cấu hình SMTP_HOST/SMTP_USER/SMTP_PASS để gửi OTP về email.");
+  }
+
+  await sendSmtpMail(email, buildOtpEmailMessage(email, otp));
+}
+
+function isValidEmailAddress(email) {
+  return /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,63}$/i.test(email)
+    && !email.includes(" ")
+    && email.indexOf("@") === email.lastIndexOf("@");
+}
+
+function buildOtpEmailMessage(toEmail, otp) {
+  const subject = "Ma OTP So Tay Nau An AI";
+  const body = [
+    "Xin chao,",
+    "",
+    `Ma OTP dang ky tai khoan So Tay Nau An AI cua ban la: ${otp}`,
+    "",
+    "Ma nay chi dung cho phien dang ky hien tai.",
+    "Neu ban khong yeu cau tao tai khoan, vui long bo qua email nay."
+  ].join("\r\n");
+  return [
+    `From: ${formatEmailAddress(SMTP_FROM)}`,
+    `To: ${formatEmailAddress(toEmail)}`,
+    `Subject: ${subject}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=utf-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    body
+  ].join("\r\n");
+}
+
+async function sendSmtpMail(toEmail, message) {
+  const socket = await openSmtpSocket();
+  let secureSocket = socket;
+  try {
+    await expectSmtp(secureSocket, [220]);
+    await smtpCommand(secureSocket, `EHLO ${smtpDomain()}`, [250]);
+
+    if (!SMTP_SECURE && SMTP_PORT === 587) {
+      await smtpCommand(secureSocket, "STARTTLS", [220]);
+      secureSocket = tls.connect({ socket, servername: SMTP_HOST });
+      await waitForSecureConnect(secureSocket);
+      await smtpCommand(secureSocket, `EHLO ${smtpDomain()}`, [250]);
+    }
+
+    await smtpCommand(secureSocket, "AUTH LOGIN", [334]);
+    await smtpCommand(secureSocket, Buffer.from(SMTP_USER).toString("base64"), [334]);
+    await smtpCommand(secureSocket, Buffer.from(SMTP_PASS).toString("base64"), [235]);
+    await smtpCommand(secureSocket, `MAIL FROM:<${extractEmailAddress(SMTP_FROM)}>`, [250]);
+    await smtpCommand(secureSocket, `RCPT TO:<${toEmail}>`, [250, 251]);
+    await smtpCommand(secureSocket, "DATA", [354]);
+    await smtpCommand(secureSocket, `${message}\r\n.`, [250]);
+    await smtpCommand(secureSocket, "QUIT", [221]);
+  } catch (error) {
+    throw createBackendError(502, "SMTP_SEND_FAILED",
+      "Backend chưa gửi được OTP qua SMTP: " + cleanText(error.message).slice(0, 180));
+  } finally {
+    secureSocket.destroy();
+  }
+}
+
+function openSmtpSocket() {
+  return new Promise((resolve, reject) => {
+    const socket = SMTP_SECURE
+      ? tls.connect({ host: SMTP_HOST, port: SMTP_PORT, servername: SMTP_HOST })
+      : net.connect({ host: SMTP_HOST, port: SMTP_PORT });
+    socket.setEncoding("utf8");
+    socket.setTimeout(10000);
+    if (SMTP_SECURE) {
+      socket.once("secureConnect", () => resolve(socket));
+    } else {
+      socket.once("connect", () => resolve(socket));
+    }
+    socket.once("timeout", () => {
+      socket.destroy();
+      reject(new Error("SMTP timeout"));
+    });
+    socket.once("error", reject);
+  });
+}
+
+function waitForSecureConnect(socket) {
+  return new Promise((resolve, reject) => {
+    socket.once("secureConnect", resolve);
+    socket.once("error", reject);
+  });
+}
+
+function smtpCommand(socket, command, expectedCodes) {
+  socket.write(command + "\r\n");
+  return expectSmtp(socket, expectedCodes);
+}
+
+function expectSmtp(socket, expectedCodes) {
+  return new Promise((resolve, reject) => {
+    let buffer = "";
+    const onData = chunk => {
+      buffer += chunk;
+      const lines = buffer.split(/\r?\n/).filter(Boolean);
+      const lastLine = lines[lines.length - 1] || "";
+      if (!/^\d{3} /.test(lastLine)) {
+        return;
+      }
+      socket.off("data", onData);
+      const code = Number(lastLine.slice(0, 3));
+      if (expectedCodes.includes(code)) {
+        resolve(buffer);
+      } else {
+        reject(new Error(lastLine));
+      }
+    };
+    socket.on("data", onData);
+  });
+}
+
+function smtpDomain() {
+  return "sotaynauan.local";
+}
+
+function formatEmailAddress(value) {
+  const email = extractEmailAddress(value);
+  return email === value ? email : value;
+}
+
+function extractEmailAddress(value) {
+  const text = cleanText(value);
+  const match = text.match(/<([^>]+)>/);
+  return match ? match[1] : text;
 }
 
 async function handleCommunityRequest(req, res) {

@@ -19,6 +19,10 @@ public class LoginViewModel {
         return authRepository.register(credentials);
     }
 
+    public AuthResult validateRegistrationRequest(AuthCredentials credentials) {
+        return authRepository.validateRegistrationRequest(credentials);
+    }
+
     public AuthResult recoverPassword(String email) {
         return authRepository.recoverPassword(email);
     }

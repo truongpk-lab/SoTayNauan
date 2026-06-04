@@ -13,11 +13,15 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 public class AuthRepository {
     private static final String DEMO_EMAIL = "demo@local.test";
     private static final String DEMO_PASSWORD = "123456";
     private static final String DEMO_DISPLAY_NAME = "Demo Chef";
+    private static final Pattern EMAIL_STRUCTURE_PATTERN = Pattern.compile(
+            "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,63}$",
+            Pattern.CASE_INSENSITIVE);
 
     private final AuthLocalDataSource authLocalDataSource;
     private final SessionRepository sessionRepository;
@@ -48,16 +52,12 @@ public class AuthRepository {
     }
 
     public AuthResult register(AuthCredentials credentials) {
-        AuthResult validation = validateCredentials(credentials);
+        AuthResult validation = validateRegistrationRequest(credentials);
         if (!validation.isSuccess()) {
             return validation;
         }
 
         String email = normalizeEmail(credentials.getEmail());
-        if (authLocalDataSource.findUserByEmail(email) != null) {
-            return AuthResult.error("Email này đã được đăng ký trên thiết bị.");
-        }
-
         String displayName = buildDisplayName(email);
         AuthUser user = new AuthUser(
                 UUID.randomUUID().toString(),
@@ -69,6 +69,18 @@ public class AuthRepository {
         authLocalDataSource.saveUser(user);
         sessionRepository.saveSession(new AppSession(user.getUserId(), user.getDisplayName(), true));
         return AuthResult.success("Tạo tài khoản local thành công.", user);
+    }
+
+    public AuthResult validateRegistrationRequest(AuthCredentials credentials) {
+        AuthResult validation = validateCredentials(credentials);
+        if (!validation.isSuccess()) {
+            return validation;
+        }
+        String email = normalizeEmail(credentials.getEmail());
+        if (authLocalDataSource.findUserByEmail(email) != null) {
+            return AuthResult.error("Email này đã được đăng ký trên thiết bị.");
+        }
+        return AuthResult.success("Email hợp lệ. OTP sẽ được gửi về email để xác nhận đăng ký.", null);
     }
 
     public AuthResult recoverPassword(String email) {
@@ -109,7 +121,20 @@ public class AuthRepository {
     }
 
     private boolean isValidEmail(String email) {
-        return Patterns.EMAIL_ADDRESS.matcher(normalizeEmail(email)).matches();
+        String normalizedEmail = normalizeEmail(email);
+        if (normalizedEmail.isEmpty()
+                || normalizedEmail.contains(" ")
+                || normalizedEmail.indexOf("@") != normalizedEmail.lastIndexOf("@")) {
+            return false;
+        }
+        int atIndex = normalizedEmail.indexOf("@");
+        if (atIndex <= 0 || atIndex >= normalizedEmail.length() - 1) {
+            return false;
+        }
+        String domain = normalizedEmail.substring(atIndex + 1);
+        return domain.contains(".")
+                && EMAIL_STRUCTURE_PATTERN.matcher(normalizedEmail).matches()
+                && Patterns.EMAIL_ADDRESS.matcher(normalizedEmail).matches();
     }
 
     private String normalizeEmail(String email) {
