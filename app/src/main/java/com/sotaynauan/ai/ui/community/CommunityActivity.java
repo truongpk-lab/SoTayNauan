@@ -51,6 +51,7 @@ import com.sotaynauan.ai.ui.profile.ProfileActivity;
 import com.sotaynauan.ai.ui.recipe.RecipeDetailActivity;
 import com.sotaynauan.ai.ui.search.SearchActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingListActivity;
+import com.sotaynauan.ai.util.AppNavigator;
 import com.sotaynauan.ai.util.RecipeImageResolver;
 
 import java.text.Normalizer;
@@ -176,7 +177,7 @@ public class CommunityActivity extends Activity {
 
     private void bindActions() {
         findViewById(R.id.communityMenuButton).setOnClickListener(view ->
-                startActivity(new Intent(this, HomeActivity.class)));
+                AppNavigator.openTopLevel(this, HomeActivity.class));
         findViewById(R.id.inviteMemberButton).setOnClickListener(view -> {
             activeTab = TAB_DISCOVER;
             bindState(viewModel.load());
@@ -213,15 +214,15 @@ public class CommunityActivity extends Activity {
         });
 
         findViewById(R.id.homeTab).setOnClickListener(view ->
-                startActivity(new Intent(this, HomeActivity.class)));
+                AppNavigator.openTopLevel(this, HomeActivity.class));
         findViewById(R.id.searchTab).setOnClickListener(view ->
-                startActivity(new Intent(this, SearchActivity.class)));
+                AppNavigator.openTopLevel(this, SearchActivity.class));
         findViewById(R.id.aiChefTab).setOnClickListener(view ->
-                startActivity(new Intent(this, AiChefActivity.class)));
+                AppNavigator.openTopLevel(this, AiChefActivity.class));
         findViewById(R.id.shoppingTab).setOnClickListener(view ->
-                startActivity(new Intent(this, ShoppingListActivity.class)));
+                AppNavigator.openTopLevel(this, ShoppingListActivity.class));
         findViewById(R.id.profileTab).setOnClickListener(view ->
-                startActivity(new Intent(this, ProfileActivity.class)));
+                AppNavigator.openTopLevel(this, ProfileActivity.class));
     }
 
     private void bindState(CommunityState state) {

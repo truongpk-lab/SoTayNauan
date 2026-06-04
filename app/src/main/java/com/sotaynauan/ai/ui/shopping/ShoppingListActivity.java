@@ -29,6 +29,7 @@ import com.sotaynauan.ai.ui.community.CommunityActivity;
 import com.sotaynauan.ai.ui.home.HomeActivity;
 import com.sotaynauan.ai.ui.profile.ProfileActivity;
 import com.sotaynauan.ai.ui.search.SearchActivity;
+import com.sotaynauan.ai.util.AppNavigator;
 
 import java.text.DateFormat;
 import java.util.ArrayList;
@@ -102,14 +103,14 @@ public class ShoppingListActivity extends Activity {
         findViewById(R.id.addItemButton).setOnClickListener(view -> showItemDialog(null));
         shoppingModeButton.setOnClickListener(view -> toggleMarketMode());
         findViewById(R.id.homeTab).setOnClickListener(view ->
-                startActivity(new Intent(this, HomeActivity.class)));
+                AppNavigator.openTopLevel(this, HomeActivity.class));
         findViewById(R.id.searchTab).setOnClickListener(view ->
-                startActivity(new Intent(this, SearchActivity.class)));
+                AppNavigator.openTopLevel(this, SearchActivity.class));
         findViewById(R.id.aiChefTab).setOnClickListener(view ->
-                startActivity(new Intent(this, AiChefActivity.class)));
+                AppNavigator.openTopLevel(this, AiChefActivity.class));
         findViewById(R.id.shoppingTab).setOnClickListener(view -> bindState(viewModel.loadList()));
         findViewById(R.id.profileTab).setOnClickListener(view ->
-                startActivity(new Intent(this, ProfileActivity.class)));
+                AppNavigator.openTopLevel(this, ProfileActivity.class));
     }
 
     private void bindState(ShoppingPlanState state) {

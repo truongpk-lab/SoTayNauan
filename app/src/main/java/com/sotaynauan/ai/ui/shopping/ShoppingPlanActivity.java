@@ -22,6 +22,7 @@ import com.sotaynauan.ai.data.repository.ShoppingRepository;
 import com.sotaynauan.ai.ui.ai.AiChefActivity;
 import com.sotaynauan.ai.ui.home.HomeActivity;
 import com.sotaynauan.ai.ui.profile.ProfileActivity;
+import com.sotaynauan.ai.util.AppNavigator;
 
 import java.text.DateFormat;
 import java.util.ArrayList;
@@ -91,18 +92,18 @@ public class ShoppingPlanActivity extends Activity {
         findViewById(R.id.backButton).setOnClickListener(view -> finish());
         createShoppingListButton.setOnClickListener(view -> {
             bindState(viewModel.createShoppingList());
-            startActivity(new Intent(this, ShoppingListActivity.class));
+            AppNavigator.openTopLevel(this, ShoppingListActivity.class);
         });
         LinearLayout bottomBar = (LinearLayout) createShoppingListButton.getParent();
         LinearLayout tabs = (LinearLayout) bottomBar.getChildAt(1);
         tabs.getChildAt(0).setOnClickListener(view ->
-                startActivity(new Intent(this, HomeActivity.class)));
+                AppNavigator.openTopLevel(this, HomeActivity.class));
         tabs.getChildAt(3).setOnClickListener(view ->
-                startActivity(new Intent(this, ShoppingListActivity.class)));
+                AppNavigator.openTopLevel(this, ShoppingListActivity.class));
         tabs.getChildAt(2).setOnClickListener(view ->
-                startActivity(new Intent(this, AiChefActivity.class)));
+                AppNavigator.openTopLevel(this, AiChefActivity.class));
         tabs.getChildAt(4).setOnClickListener(view ->
-                startActivity(new Intent(this, ProfileActivity.class)));
+                AppNavigator.openTopLevel(this, ProfileActivity.class));
     }
 
     private void bindState(ShoppingPlanState state) {

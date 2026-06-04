@@ -36,6 +36,8 @@ import com.sotaynauan.ai.ui.home.HomeActivity;
 import com.sotaynauan.ai.ui.profile.ProfileActivity;
 import com.sotaynauan.ai.ui.recipe.RecipeDetailActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingListActivity;
+import com.sotaynauan.ai.util.AppExecutors;
+import com.sotaynauan.ai.util.AppNavigator;
 
 import java.text.Normalizer;
 import java.util.ArrayList;
@@ -101,12 +103,32 @@ public class SearchActivity extends Activity {
                 new CommunityMapper());
         recipeAdapter = new HomeRecipeAdapter(this, this::openRecipe);
 
-        allRecipes.addAll(recipeRepository.getAllRecipes());
-        allUsers.addAll(loadUsers());
-
         buildLayout();
         bindFilters();
         bindResults();
+        loadSearchData();
+    }
+
+    private void loadSearchData() {
+        statusText.setText("Đang tải món ăn và dữ liệu cộng đồng...");
+        AppExecutors.runOnIo(
+                () -> new SearchData(recipeRepository.getAllRecipes(), loadUsers()),
+                data -> {
+                    if (!canBindUi()) {
+                        return;
+                    }
+                    allRecipes.clear();
+                    allRecipes.addAll(data.recipes);
+                    allUsers.clear();
+                    allUsers.addAll(data.users);
+                    bindResults();
+                },
+                exception -> {
+                    if (canBindUi()) {
+                        statusText.setText("Chưa tải được dữ liệu tìm kiếm: "
+                                + exception.getMessage());
+                    }
+                });
     }
 
     private void buildLayout() {
@@ -134,7 +156,7 @@ public class SearchActivity extends Activity {
         backButton.setBackground(round(Color.parseColor("#FFF1EC"), dp(18), Color.parseColor("#FFD7C7")));
         backButton.setGravity(Gravity.CENTER);
         backButton.setPadding(dp(14), dp(10), dp(14), dp(10));
-        backButton.setOnClickListener(view -> startActivity(new Intent(this, HomeActivity.class)));
+        backButton.setOnClickListener(view -> AppNavigator.openTopLevel(this, HomeActivity.class));
         headerRow.addView(backButton);
 
         TextView title = text("Tìm kiếm món ăn", 28, getColor(R.color.on_surface), true);
@@ -592,15 +614,15 @@ public class SearchActivity extends Activity {
         bottomBar.setElevation(dp(10));
 
         bottomBar.addView(createNavItem("Trang chủ", false, view ->
-                startActivity(new Intent(this, HomeActivity.class))));
+                AppNavigator.openTopLevel(this, HomeActivity.class)));
         bottomBar.addView(createNavItem("Tìm kiếm", true, view ->
                 statusText.setText("Bạn đang ở màn tìm kiếm món ăn.")));
         bottomBar.addView(createNavItem("AI Chef", false, view ->
-                startActivity(new Intent(this, AiChefActivity.class))));
+                AppNavigator.openTopLevel(this, AiChefActivity.class)));
         bottomBar.addView(createNavItem("Đi chợ", false, view ->
-                startActivity(new Intent(this, ShoppingListActivity.class))));
+                AppNavigator.openTopLevel(this, ShoppingListActivity.class)));
         bottomBar.addView(createNavItem("Cá nhân", false, view ->
-                startActivity(new Intent(this, ProfileActivity.class))));
+                AppNavigator.openTopLevel(this, ProfileActivity.class)));
         return bottomBar;
     }
 
@@ -702,8 +724,22 @@ public class SearchActivity extends Activity {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
+    private boolean canBindUi() {
+        return !isFinishing() && !isDestroyed();
+    }
+
     private interface OnFilterClickListener {
         void onClick(String value);
+    }
+
+    private static final class SearchData {
+        private final List<Recipe> recipes;
+        private final List<CommunityFriend> users;
+
+        private SearchData(List<Recipe> recipes, List<CommunityFriend> users) {
+            this.recipes = recipes;
+            this.users = users;
+        }
     }
 
     private static final class FilterItem {

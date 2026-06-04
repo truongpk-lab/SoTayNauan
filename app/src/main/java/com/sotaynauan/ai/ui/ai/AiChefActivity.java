@@ -15,6 +15,7 @@ import com.sotaynauan.ai.ui.home.HomeActivity;
 import com.sotaynauan.ai.ui.profile.ProfileActivity;
 import com.sotaynauan.ai.ui.search.SearchActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingListActivity;
+import com.sotaynauan.ai.util.AppNavigator;
 
 public class AiChefActivity extends Activity {
     private AiChefViewModel viewModel;
@@ -61,16 +62,14 @@ public class AiChefActivity extends Activity {
     }
 
     private void bindBottomNavigation() {
-        findViewById(R.id.homeTab).setOnClickListener(view -> {
-            startActivity(new Intent(this, HomeActivity.class));
-            finish();
-        });
+        findViewById(R.id.homeTab).setOnClickListener(view ->
+                AppNavigator.openTopLevel(this, HomeActivity.class));
         findViewById(R.id.searchTab).setOnClickListener(view ->
-                startActivity(new Intent(this, SearchActivity.class)));
+                AppNavigator.openTopLevel(this, SearchActivity.class));
         findViewById(R.id.aiChefTab).setOnClickListener(view -> bindState(viewModel.loadState()));
         findViewById(R.id.shoppingTab).setOnClickListener(view ->
-                startActivity(new Intent(this, ShoppingListActivity.class)));
+                AppNavigator.openTopLevel(this, ShoppingListActivity.class));
         findViewById(R.id.profileTab).setOnClickListener(view ->
-                startActivity(new Intent(this, ProfileActivity.class)));
+                AppNavigator.openTopLevel(this, ProfileActivity.class));
     }
 }
