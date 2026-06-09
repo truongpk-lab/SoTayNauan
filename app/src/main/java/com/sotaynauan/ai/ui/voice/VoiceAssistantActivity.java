@@ -32,6 +32,7 @@ import com.sotaynauan.ai.data.repository.VoiceAssistantRepository;
 import com.sotaynauan.ai.data.seed.SeedDataProvider;
 import com.sotaynauan.ai.service.voice.VoiceSpeaker;
 import com.sotaynauan.ai.ui.cooking.CookingModeActivity;
+import com.sotaynauan.ai.util.AppExecutors;
 import com.sotaynauan.ai.util.RecipeImageResolver;
 
 import java.io.ByteArrayOutputStream;
@@ -74,15 +75,18 @@ public class VoiceAssistantActivity extends Activity {
     private boolean listening;
     private boolean handsFreeMode;
     private boolean analyzingAudio;
+    private volatile boolean commandInFlight;
+    private volatile boolean destroyed;
     private int pulseFrame;
     private long recordingStartedAt;
     private long lastLoudAudioAt;
     private boolean heardAudio;
+    private Runnable handsFreeRestart;
 
     private final Runnable listeningPulse = new Runnable() {
         @Override
         public void run() {
-            if (!listening) {
+            if (!isActive() || !listening) {
                 return;
             }
             pulseFrame = (pulseFrame + 1) % 6;
@@ -99,7 +103,7 @@ public class VoiceAssistantActivity extends Activity {
     private final Runnable amplitudePoll = new Runnable() {
         @Override
         public void run() {
-            if (!listening || mediaRecorder == null) {
+            if (!isActive() || !listening || mediaRecorder == null) {
                 return;
             }
             int amplitude = 0;
@@ -145,8 +149,11 @@ public class VoiceAssistantActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        waveHandler.removeCallbacks(listeningPulse);
-        waveHandler.removeCallbacks(amplitudePoll);
+        destroyed = true;
+        handsFreeMode = false;
+        listening = false;
+        analyzingAudio = false;
+        waveHandler.removeCallbacksAndMessages(null);
         releaseRecorder();
         if (voiceSpeaker != null) {
             voiceSpeaker.shutdown();
@@ -208,7 +215,7 @@ public class VoiceAssistantActivity extends Activity {
                 startActivity(new Intent(this, VoiceSettingsActivity.class)));
         micButton.setOnClickListener(view -> startVoiceInput());
         autoReadSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (bindingSwitch) {
+            if (bindingSwitch || !isActive()) {
                 return;
             }
             bindState(viewModel.setAutoReadEnabled(isChecked, activeRecipeId), isChecked);
@@ -216,6 +223,9 @@ public class VoiceAssistantActivity extends Activity {
     }
 
     private void bindState(VoiceAssistantState state, boolean speakResponse) {
+        if (!isActive()) {
+            return;
+        }
         statusTitle.setText(state.getStatusTitle());
         statusSubtitle.setText(state.getStatusSubtitle());
         transcriptText.setText("\"" + state.getTranscript() + "\"");
@@ -238,25 +248,52 @@ public class VoiceAssistantActivity extends Activity {
         } else if (!state.isAutoReadEnabled()) {
             voiceSpeaker.stop();
         }
-        if (handsFreeMode && !state.isListening() && !analyzingAudio) {
+        if (handsFreeMode && !state.isListening() && !analyzingAudio && !commandInFlight) {
             scheduleHandsFreeRestart(speakResponse ? 2600L : HANDS_FREE_RESTART_MS);
         }
     }
 
     private void runCommandWithBackend(String command) {
-        new Thread(() -> {
-            VoiceAssistantState state = viewModel.handleCommandWithAiBackend(command, activeRecipeId);
-            runOnUiThread(() -> bindState(state, true));
-        }).start();
+        if (!isActive() || commandInFlight) {
+            return;
+        }
+        commandInFlight = true;
+        statusSubtitle.setText("Đang xử lý lệnh...");
+        AppExecutors.runOnIo(() -> {
+            try {
+                VoiceAssistantState state = viewModel.handleCommandWithAiBackend(command, activeRecipeId);
+                if (!isActive()) {
+                    commandInFlight = false;
+                    return;
+                }
+                runOnUiThread(() -> {
+                    commandInFlight = false;
+                    bindState(state, true);
+                });
+            } catch (Exception exception) {
+                if (!isActive()) {
+                    commandInFlight = false;
+                    return;
+                }
+                runOnUiThread(() -> {
+                    commandInFlight = false;
+                    bindRecordingError("Chưa xử lý được lệnh: " + exception.getMessage());
+                });
+            }
+        });
     }
 
     private void startVoiceInput() {
+        if (!isActive()) {
+            return;
+        }
         if (listening) {
             stopRecordingAndAnalyze();
             return;
         }
         if (analyzingAudio) {
             handsFreeMode = false;
+            cancelHandsFreeRestart();
             statusSubtitle.setText("Đã tạm dừng nghe liên tục");
             return;
         }
@@ -272,6 +309,9 @@ public class VoiceAssistantActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (!isActive()) {
+            return;
+        }
         if (requestCode == REQUEST_RECORD_AUDIO
                 && grantResults.length > 0
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -282,6 +322,10 @@ public class VoiceAssistantActivity extends Activity {
     }
 
     private void startRecording() {
+        if (!isActive()) {
+            return;
+        }
+        cancelHandsFreeRestart();
         releaseRecorder();
         try {
             recordingFile = File.createTempFile("voice-command-", ".m4a", getCacheDir());
@@ -315,7 +359,7 @@ public class VoiceAssistantActivity extends Activity {
     }
 
     private void stopRecordingAndAnalyze() {
-        if (!listening) {
+        if (!isActive() || !listening) {
             return;
         }
         listening = false;
@@ -355,15 +399,19 @@ public class VoiceAssistantActivity extends Activity {
     }
 
     private void runRecordedAudioWithBackend(File audioFile) {
-        new Thread(() -> {
+        AppExecutors.runOnIo(() -> {
             byte[] audioBytes;
             try {
                 audioBytes = readFileBytes(audioFile);
             } catch (IOException exception) {
-                runOnUiThread(() -> {
+                if (isActive()) {
+                    runOnUiThread(() -> {
+                        analyzingAudio = false;
+                        bindRecordingError("Không đọc được file ghi âm: " + exception.getMessage());
+                    });
+                } else {
                     analyzingAudio = false;
-                    bindRecordingError("Không đọc được file ghi âm: " + exception.getMessage());
-                });
+                }
                 return;
             } finally {
                 if (audioFile != null) {
@@ -371,11 +419,15 @@ public class VoiceAssistantActivity extends Activity {
                 }
             }
             VoiceAssistantState state = viewModel.handleRecordedAudioWithAiBackend(audioBytes, activeRecipeId);
+            if (!isActive()) {
+                analyzingAudio = false;
+                return;
+            }
             runOnUiThread(() -> {
                 analyzingAudio = false;
                 bindState(state, true);
             });
-        }).start();
+        });
     }
 
     private byte[] readFileBytes(File file) throws IOException {
@@ -425,6 +477,9 @@ public class VoiceAssistantActivity extends Activity {
     }
 
     private void startWavePulse() {
+        if (!isActive()) {
+            return;
+        }
         waveHandler.removeCallbacks(listeningPulse);
         setWaveBars(12, 24, 36, 26, 14);
         waveHandler.postDelayed(listeningPulse, LISTENING_PULSE_MS);
@@ -436,7 +491,7 @@ public class VoiceAssistantActivity extends Activity {
     }
 
     private void updateWaveFromAmplitude(int amplitude) {
-        if (!listening) {
+        if (!isActive() || !listening) {
             return;
         }
         float level = Math.max(0f, Math.min(1f, amplitude / 12000f));
@@ -458,6 +513,9 @@ public class VoiceAssistantActivity extends Activity {
     }
 
     private void bindRecordingError(String message) {
+        if (!isActive()) {
+            return;
+        }
         analyzingAudio = false;
         VoiceAssistantState state = viewModel.loadState(activeRecipeId);
         statusTitle.setText("Chưa ghi được");
@@ -474,12 +532,25 @@ public class VoiceAssistantActivity extends Activity {
     }
 
     private void scheduleHandsFreeRestart(long delayMs) {
+        cancelHandsFreeRestart();
         waveHandler.removeCallbacks(amplitudePoll);
-        waveHandler.postDelayed(() -> {
-            if (handsFreeMode && !listening && !analyzingAudio && !isFinishing()) {
+        handsFreeRestart = () -> {
+            if (handsFreeMode && !listening && !analyzingAudio && !commandInFlight && isActive()) {
                 startRecording();
             }
-        }, delayMs);
+        };
+        waveHandler.postDelayed(handsFreeRestart, delayMs);
+    }
+
+    private void cancelHandsFreeRestart() {
+        if (handsFreeRestart != null) {
+            waveHandler.removeCallbacks(handsFreeRestart);
+            handsFreeRestart = null;
+        }
+    }
+
+    private boolean isActive() {
+        return !destroyed && !isFinishing() && !isDestroyed();
     }
 
 }

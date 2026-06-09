@@ -69,6 +69,7 @@ public class CookingTimerDoneActivity extends Activity {
     @Override
     protected void onDestroy() {
         stopAlarmHardware();
+        clearVisualAlarm();
         super.onDestroy();
     }
 
@@ -175,6 +176,12 @@ public class CookingTimerDoneActivity extends Activity {
         pulse.setRepeatCount(Animation.INFINITE);
         pulse.setRepeatMode(Animation.REVERSE);
         findViewById(viewId).startAnimation(pulse);
+    }
+
+    private void clearVisualAlarm() {
+        findViewById(R.id.timerDoneSpeaker).clearAnimation();
+        findViewById(R.id.timerDoneWaveLarge).clearAnimation();
+        findViewById(R.id.timerDoneWaveSmall).clearAnimation();
     }
 
     private void styleSystemBars() {

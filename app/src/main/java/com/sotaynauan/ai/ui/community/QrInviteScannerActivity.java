@@ -43,8 +43,13 @@ public class QrInviteScannerActivity extends ComponentActivity {
 
     private static final int REQUEST_CAMERA_PERMISSION = 91;
 
+    private volatile boolean destroyed;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final Executor mainExecutor = command -> mainHandler.post(command);
+    private final Executor mainExecutor = command -> {
+        if (!destroyed) {
+            mainHandler.post(command);
+        }
+    };
     private final ExecutorService scanExecutor = Executors.newSingleThreadExecutor();
     private final MultiFormatReader qrReader = new MultiFormatReader();
 
@@ -77,8 +82,15 @@ public class QrInviteScannerActivity extends ComponentActivity {
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
+        destroyed = true;
+        finished = true;
+        mainHandler.removeCallbacksAndMessages(null);
+        if (cameraProvider != null) {
+            cameraProvider.unbindAll();
+        }
+        qrReader.reset();
         scanExecutor.shutdownNow();
+        super.onDestroy();
     }
 
     @Override
@@ -86,6 +98,9 @@ public class QrInviteScannerActivity extends ComponentActivity {
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode != REQUEST_CAMERA_PERMISSION) {
+            return;
+        }
+        if (!isActive()) {
             return;
         }
         if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -96,11 +111,17 @@ public class QrInviteScannerActivity extends ComponentActivity {
     }
 
     private void startCamera() {
+        if (!isActive()) {
+            return;
+        }
         statusText.setText("Đưa mã QR vào khung hình");
         ListenableFuture<ProcessCameraProvider> providerFuture =
                 ProcessCameraProvider.getInstance(this);
         providerFuture.addListener(() -> {
             try {
+                if (!isActive()) {
+                    return;
+                }
                 cameraProvider = providerFuture.get();
                 bindCamera();
             } catch (ExecutionException exception) {
@@ -113,7 +134,7 @@ public class QrInviteScannerActivity extends ComponentActivity {
     }
 
     private void bindCamera() {
-        if (cameraProvider == null) {
+        if (!isActive() || cameraProvider == null) {
             return;
         }
 
@@ -138,7 +159,7 @@ public class QrInviteScannerActivity extends ComponentActivity {
 
     @ExperimentalGetImage
     private void analyzeQr(ImageProxy imageProxy) {
-        if (finished) {
+        if (finished || destroyed) {
             imageProxy.close();
             return;
         }
@@ -200,17 +221,28 @@ public class QrInviteScannerActivity extends ComponentActivity {
     private void returnPayload(String payload) {
         String cleanPayload = payload == null ? "" : payload.trim();
         if (cleanPayload.isEmpty()) {
-            mainHandler.post(() -> statusText.setText("Mã lời mời đang trống."));
+            mainHandler.post(() -> {
+                if (isActive()) {
+                    statusText.setText("Mã lời mời đang trống.");
+                }
+            });
             return;
         }
         if (finished) {
             return;
         }
         finished = true;
-        mainHandler.post(() -> completePayload(cleanPayload));
+        mainHandler.post(() -> {
+            if (isActive()) {
+                completePayload(cleanPayload);
+            }
+        });
     }
 
     private void completePayload(String payload) {
+        if (!isActive()) {
+            return;
+        }
         if (cameraProvider != null) {
             cameraProvider.unbindAll();
         }
@@ -223,5 +255,9 @@ public class QrInviteScannerActivity extends ComponentActivity {
         return previewView.getDisplay() == null
                 ? Surface.ROTATION_0
                 : previewView.getDisplay().getRotation();
+    }
+
+    private boolean isActive() {
+        return !destroyed && !isFinishing() && !isDestroyed();
     }
 }

@@ -28,6 +28,7 @@ import com.sotaynauan.ai.data.remote.AiBackendRemoteDataSource.RecipeNameSuggest
 import com.sotaynauan.ai.data.repository.RecipeRepository;
 import com.sotaynauan.ai.data.seed.SeedDataProvider;
 import com.sotaynauan.ai.ui.recipe.RecipeDetailActivity;
+import com.sotaynauan.ai.util.AppExecutors;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -45,6 +46,7 @@ public class AddRecipeActivity extends Activity {
     private Button suggestButton;
     private LinearLayout suggestionContainer;
     private TextView statusText;
+    private boolean busy;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -103,6 +105,9 @@ public class AddRecipeActivity extends Activity {
     }
 
     private void loadRelatedRecipes() {
+        if (busy) {
+            return;
+        }
         hideKeyboard();
         String dishName = clean(dishNameInput.getText().toString());
         if (dishName.isEmpty()) {
@@ -111,7 +116,7 @@ public class AddRecipeActivity extends Activity {
         }
         setBusy(true, "Đang hỏi Gemini tìm 5 món liên quan nhất...");
         suggestionContainer.removeAllViews();
-        new Thread(() -> {
+        AppExecutors.runOnIo(() -> {
             try {
                 List<String> existingNames = new ArrayList<>();
                 for (Recipe recipe : recipeRepository.getAllRecipes()) {
@@ -119,16 +124,20 @@ public class AddRecipeActivity extends Activity {
                 }
                 List<RecipeNameSuggestion> suggestions =
                         aiBackendRemoteDataSource.suggestRelatedRecipes(dishName, existingNames);
-                runOnUiThread(() -> bindSuggestions(suggestions));
+                if (isActive()) {
+                    runOnUiThread(() -> bindSuggestions(suggestions));
+                }
             } catch (Exception exception) {
-                runOnUiThread(() -> setBusy(false,
-                        "Không gọi được Gemini để tìm món: " + safeErrorMessage(exception)));
+                if (isActive()) {
+                    runOnUiThread(() -> setBusy(false,
+                            "Không gọi được Gemini để tìm món: " + safeErrorMessage(exception)));
+                }
             }
-        }).start();
+        });
     }
 
     private void bindSuggestions(List<RecipeNameSuggestion> suggestions) {
-        if (isFinishing() || isDestroyed()) {
+        if (!isActive()) {
             return;
         }
         suggestionContainer.removeAllViews();
@@ -168,9 +177,12 @@ public class AddRecipeActivity extends Activity {
     }
 
     private void importSelectedRecipe(String recipeName) {
+        if (busy) {
+            return;
+        }
         setBusy(true, "Đang tìm công thức " + recipeName
                 + " trên các trang hướng dẫn nấu ăn và chuẩn hóa dữ liệu...");
-        new Thread(() -> {
+        AppExecutors.runOnIo(() -> {
             try {
                 GeneratedRecipe generatedRecipe =
                         aiBackendRemoteDataSource.generateRecipeFromWeb(recipeName);
@@ -189,20 +201,26 @@ public class AddRecipeActivity extends Activity {
                         generatedRecipe.getIngredients(),
                         generatedRecipe.getSteps());
                 if (recipe == null) {
-                    runOnUiThread(() -> setBusy(false,
-                            "Không lưu được công thức. Tên món có thể đã tồn tại trong kho local."));
+                    if (isActive()) {
+                        runOnUiThread(() -> setBusy(false,
+                                "Không lưu được công thức. Tên món có thể đã tồn tại trong kho local."));
+                    }
                     return;
                 }
-                runOnUiThread(() -> openRecipeDetail(recipe));
+                if (isActive()) {
+                    runOnUiThread(() -> openRecipeDetail(recipe));
+                }
             } catch (Exception exception) {
-                runOnUiThread(() -> setBusy(false,
-                        "Không tạo được công thức từ Gemini: " + safeErrorMessage(exception)));
+                if (isActive()) {
+                    runOnUiThread(() -> setBusy(false,
+                            "Không tạo được công thức từ Gemini: " + safeErrorMessage(exception)));
+                }
             }
-        }).start();
+        });
     }
 
     private void openRecipeDetail(Recipe recipe) {
-        if (isFinishing() || isDestroyed()) {
+        if (!isActive()) {
             return;
         }
         statusText.setText("Đã lưu " + recipe.getName() + " vào kho công thức local.");
@@ -213,6 +231,10 @@ public class AddRecipeActivity extends Activity {
     }
 
     private void setBusy(boolean busy, String message) {
+        if (!isActive()) {
+            return;
+        }
+        this.busy = busy;
         suggestButton.setEnabled(!busy);
         dishNameInput.setEnabled(!busy);
         suggestButton.setAlpha(busy ? 0.72f : 1f);
@@ -224,6 +246,10 @@ public class AddRecipeActivity extends Activity {
         if (message != null && !message.trim().isEmpty()) {
             statusText.setText(message);
         }
+    }
+
+    private boolean isActive() {
+        return !isFinishing() && !isDestroyed();
     }
 
     private EditText input(String hint) {

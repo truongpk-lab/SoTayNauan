@@ -36,10 +36,14 @@ public class CookingTimerActivity extends Activity {
     private Button addMinuteButton;
     private long activeRecipeId = -1L;
     private boolean timerDoneOpened;
+    private boolean destroyed;
 
     private final Runnable timerTicker = new Runnable() {
         @Override
         public void run() {
+            if (!isActive()) {
+                return;
+            }
             bindTimer(viewModel.getTimerState());
             timerHandler.postDelayed(this, 1000L);
         }
@@ -61,6 +65,7 @@ public class CookingTimerActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        destroyed = false;
         timerHandler.removeCallbacks(timerTicker);
         timerHandler.post(timerTicker);
     }
@@ -69,6 +74,13 @@ public class CookingTimerActivity extends Activity {
     protected void onPause() {
         timerHandler.removeCallbacks(timerTicker);
         super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        destroyed = true;
+        timerHandler.removeCallbacksAndMessages(null);
+        super.onDestroy();
     }
 
     private CookingRepository createCookingRepository() {
@@ -101,6 +113,9 @@ public class CookingTimerActivity extends Activity {
     }
 
     private void bindTimer(CookingTimerState state) {
+        if (!isActive()) {
+            return;
+        }
         int remainingSeconds = Math.max(0, state.getRemainingSeconds());
         if (state.isExpired() && !state.isAlarmAcknowledged()) {
             openTimerDone(state);
@@ -148,5 +163,9 @@ public class CookingTimerActivity extends Activity {
         }
         int minutes = Math.max(1, (int) Math.ceil(remainingSeconds / 60.0));
         return "Còn " + minutes + " phút";
+    }
+
+    private boolean isActive() {
+        return !destroyed && !isFinishing() && !isDestroyed();
     }
 }

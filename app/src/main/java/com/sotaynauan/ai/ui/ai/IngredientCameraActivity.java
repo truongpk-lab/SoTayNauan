@@ -35,8 +35,13 @@ public class IngredientCameraActivity extends ComponentActivity {
 
     private static final int REQUEST_CAMERA_PERMISSION = 71;
 
+    private boolean destroyed;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final Executor mainExecutor = command -> mainHandler.post(command);
+    private final Executor mainExecutor = command -> {
+        if (!destroyed) {
+            mainHandler.post(command);
+        }
+    };
 
     private PreviewView previewView;
     private TextView statusText;
@@ -47,6 +52,7 @@ public class IngredientCameraActivity extends ComponentActivity {
     private int lensFacing = CameraSelector.LENS_FACING_BACK;
     private boolean hasBackCamera;
     private boolean hasFrontCamera;
+    private boolean capturing;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,10 +77,25 @@ public class IngredientCameraActivity extends ComponentActivity {
     }
 
     @Override
+    protected void onDestroy() {
+        destroyed = true;
+        capturing = false;
+        mainHandler.removeCallbacksAndMessages(null);
+        if (cameraProvider != null) {
+            cameraProvider.unbindAll();
+        }
+        imageCapture = null;
+        super.onDestroy();
+    }
+
+    @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode != REQUEST_CAMERA_PERMISSION) {
+            return;
+        }
+        if (!isActive()) {
             return;
         }
         if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -87,11 +108,17 @@ public class IngredientCameraActivity extends ComponentActivity {
     }
 
     private void startCamera() {
+        if (!isActive()) {
+            return;
+        }
         statusText.setText(R.string.ingredient_camera_starting);
         ListenableFuture<ProcessCameraProvider> providerFuture =
                 ProcessCameraProvider.getInstance(this);
         providerFuture.addListener(() -> {
             try {
+                if (!isActive()) {
+                    return;
+                }
                 cameraProvider = providerFuture.get();
                 hasBackCamera = cameraProvider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA);
                 hasFrontCamera = cameraProvider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA);
@@ -113,7 +140,7 @@ public class IngredientCameraActivity extends ComponentActivity {
     }
 
     private void bindCameraUseCases() {
-        if (cameraProvider == null) {
+        if (!isActive() || cameraProvider == null) {
             return;
         }
 
@@ -142,7 +169,7 @@ public class IngredientCameraActivity extends ComponentActivity {
     }
 
     private void switchCamera() {
-        if (!hasBackCamera || !hasFrontCamera) {
+        if (!isActive() || capturing || !hasBackCamera || !hasFrontCamera) {
             return;
         }
         lensFacing = lensFacing == CameraSelector.LENS_FACING_BACK
@@ -152,12 +179,16 @@ public class IngredientCameraActivity extends ComponentActivity {
     }
 
     private void takePhoto() {
+        if (!isActive() || capturing) {
+            return;
+        }
         ImageCapture activeImageCapture = imageCapture;
         if (activeImageCapture == null) {
             statusText.setText(R.string.ingredient_camera_unavailable);
             return;
         }
 
+        capturing = true;
         captureButton.setEnabled(false);
         statusText.setText(R.string.ingredient_camera_capturing);
         File photoFile = createImageFile();
@@ -167,6 +198,13 @@ public class IngredientCameraActivity extends ComponentActivity {
                 new ImageCapture.OnImageSavedCallback() {
                     @Override
                     public void onImageSaved(@NonNull ImageCapture.OutputFileResults output) {
+                        capturing = false;
+                        if (!isActive()) {
+                            if (photoFile.exists()) {
+                                photoFile.delete();
+                            }
+                            return;
+                        }
                         Intent result = new Intent()
                                 .putExtra(EXTRA_IMAGE_PATH, photoFile.getAbsolutePath());
                         setResult(Activity.RESULT_OK, result);
@@ -175,6 +213,10 @@ public class IngredientCameraActivity extends ComponentActivity {
 
                     @Override
                     public void onError(@NonNull ImageCaptureException exception) {
+                        capturing = false;
+                        if (!isActive()) {
+                            return;
+                        }
                         captureButton.setEnabled(true);
                         statusText.setText(R.string.ingredient_camera_capture_failed);
                     }
@@ -198,8 +240,15 @@ public class IngredientCameraActivity extends ComponentActivity {
     }
 
     private void showNoCamera() {
+        if (!isActive()) {
+            return;
+        }
         statusText.setText(R.string.ingredient_camera_unavailable);
         captureButton.setEnabled(false);
         switchButton.setVisibility(View.INVISIBLE);
+    }
+
+    private boolean isActive() {
+        return !destroyed && !isFinishing() && !isDestroyed();
     }
 }

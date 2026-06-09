@@ -40,6 +40,7 @@ import com.sotaynauan.ai.ui.cooking.CookingPreparationActivity;
 import com.sotaynauan.ai.ui.cooking.CookingModeActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingPlanActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingListActivity;
+import com.sotaynauan.ai.util.AppExecutors;
 import com.sotaynauan.ai.util.RecipeImageResolver;
 
 import java.util.ArrayList;
@@ -215,34 +216,38 @@ public class RecipeDetailActivity extends Activity {
         long targetRecipeId = recipeId;
         List<String> checkedIngredients = new ArrayList<>(currentState.getCheckedIngredients());
         setStartCookingBusy(true, "Đang kiểm tra kho nguyên liệu...");
-        new Thread(() -> {
+        AppExecutors.runOnIo(() -> {
             try {
                 CookingPlanEntity plan = preparationRepository
                         .preparePlanFromRecipe(targetRecipeId, 0, checkedIngredients);
                 List<CookingPlanIngredientEntity> missingIngredients =
                         preparationRepository.getMissingIngredients(plan.id);
-                runOnUiThread(() -> {
-                    if (isFinishing() || isDestroyed()) {
-                        return;
-                    }
+                if (isActive()) {
+                    runOnUiThread(() -> {
+                        if (!isActive()) {
+                            return;
+                        }
                     setStartCookingBusy(false, "");
                     if (missingIngredients.isEmpty()) {
                         openCookingMode(plan.id);
                     } else {
                         showMissingIngredientsDialog(plan.id, missingIngredients);
                     }
-                });
+                    });
+                }
             } catch (Exception exception) {
-                runOnUiThread(() -> {
-                    if (isFinishing() || isDestroyed()) {
-                        return;
-                    }
+                if (isActive()) {
+                    runOnUiThread(() -> {
+                        if (!isActive()) {
+                            return;
+                        }
                     String message = "Chưa thể bắt đầu nấu: " + safeErrorMessage(exception);
                     setStartCookingBusy(false, message);
                     showStartCookingErrorDialog(message);
-                });
+                    });
+                }
             }
-        }).start();
+        });
     }
 
     private void setStartCookingBusy(boolean busy, String message) {
@@ -297,28 +302,32 @@ public class RecipeDetailActivity extends Activity {
 
     private void addMissingIngredientsAndOpenShopping(String planId) {
         setStartCookingBusy(true, "Đang thêm nguyên liệu thiếu vào danh sách đi chợ...");
-        new Thread(() -> {
+        AppExecutors.runOnIo(() -> {
             try {
                 int added = preparationRepository.addMissingIngredientsToShoppingList(planId);
-                runOnUiThread(() -> {
-                    if (isFinishing() || isDestroyed()) {
-                        return;
-                    }
+                if (isActive()) {
+                    runOnUiThread(() -> {
+                        if (!isActive()) {
+                            return;
+                        }
                     setStartCookingBusy(false,
                             "Đã thêm " + added + " nguyên liệu cần mua vào danh sách đi chợ.");
                     startActivity(new Intent(this, ShoppingListActivity.class));
-                });
+                    });
+                }
             } catch (Exception exception) {
-                runOnUiThread(() -> {
-                    if (isFinishing() || isDestroyed()) {
-                        return;
-                    }
+                if (isActive()) {
+                    runOnUiThread(() -> {
+                        if (!isActive()) {
+                            return;
+                        }
                     String message = "Không thể thêm nguyên liệu thiếu: " + safeErrorMessage(exception);
                     setStartCookingBusy(false, message);
                     showStartCookingErrorDialog(message);
-                });
+                    });
+                }
             }
-        }).start();
+        });
     }
 
     private void showStartCookingErrorDialog(String message) {
@@ -401,6 +410,10 @@ public class RecipeDetailActivity extends Activity {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private boolean isActive() {
+        return !isFinishing() && !isDestroyed();
     }
 
     private GradientDrawable createHeroBackground(int baseColor) {

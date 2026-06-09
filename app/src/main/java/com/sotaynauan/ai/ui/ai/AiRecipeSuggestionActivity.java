@@ -5,8 +5,6 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -31,14 +29,13 @@ import com.sotaynauan.ai.ui.recipe.RecipeDetailActivity;
 import com.sotaynauan.ai.ui.search.SearchActivity;
 import com.sotaynauan.ai.ui.shopping.ShoppingListActivity;
 import com.sotaynauan.ai.util.AppNavigator;
+import com.sotaynauan.ai.util.AppExecutors;
 import com.sotaynauan.ai.util.RecipeImageResolver;
 
 import java.util.List;
 import java.util.Locale;
 
 public class AiRecipeSuggestionActivity extends Activity {
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-
     private AiRecipeSuggestionViewModel viewModel;
     private RecipeMatchAdapter adapter;
     private AiRecipeSuggestionState currentState;
@@ -56,6 +53,7 @@ public class AiRecipeSuggestionActivity extends Activity {
     private Button showMatchDetailButton;
     private LinearLayout bestMatchCard;
     private LinearLayout moreResultsContainer;
+    private boolean loadingAiSuggestions;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -114,14 +112,28 @@ public class AiRecipeSuggestionActivity extends Activity {
     }
 
     private void loadAiBackendSuggestions() {
+        if (loadingAiSuggestions) {
+            return;
+        }
+        loadingAiSuggestions = true;
         resultsStatus.setText(resultsStatus.getText() + "\nĐang hỏi AI backend...");
-        new Thread(() -> {
+        setResultActionsEnabled(false);
+        AppExecutors.runOnIo(() -> {
             AiRecipeSuggestionState aiState = viewModel.loadSuggestionsWithAiBackend();
-            mainHandler.post(() -> bindState(aiState));
-        }).start();
+            if (!isActive()) {
+                return;
+            }
+            runOnUiThread(() -> {
+                loadingAiSuggestions = false;
+                bindState(aiState);
+            });
+        });
     }
 
     private void bindState(AiRecipeSuggestionState state) {
+        if (!isActive()) {
+            return;
+        }
         currentState = state;
         RecipeMatch bestMatch = state.getBestMatch();
         resultsSubtitle.setText("AI đã phân tích " + state.getSelectedIngredients().size()
@@ -155,9 +167,7 @@ public class AiRecipeSuggestionActivity extends Activity {
                 bestMatch.getAvailableCount(), bestMatch.getRequiredCount()));
         bestMissing.setText(createMissingText(bestMatch));
         favoriteBestButton.setText(bestMatch.isFavorite() ? "Đã lưu" : "Lưu món");
-        openBestRecipeButton.setEnabled(true);
-        favoriteBestButton.setEnabled(true);
-        showMatchDetailButton.setEnabled(true);
+        setResultActionsEnabled(!loadingAiSuggestions);
         adapter.bindOtherMatches(moreResultsContainer, state.getOtherMatches());
     }
 
@@ -190,6 +200,9 @@ public class AiRecipeSuggestionActivity extends Activity {
     }
 
     private void openRecipe(long recipeId) {
+        if (!isActive()) {
+            return;
+        }
         Intent intent = new Intent(this, RecipeDetailActivity.class);
         intent.putExtra(RecipeDetailActivity.EXTRA_RECIPE_ID, recipeId);
         startActivity(intent);
@@ -222,5 +235,16 @@ public class AiRecipeSuggestionActivity extends Activity {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void setResultActionsEnabled(boolean enabled) {
+        boolean hasBestMatch = currentState != null && currentState.getBestMatch() != null;
+        openBestRecipeButton.setEnabled(enabled && hasBestMatch);
+        favoriteBestButton.setEnabled(enabled && hasBestMatch);
+        showMatchDetailButton.setEnabled(enabled && hasBestMatch);
+    }
+
+    private boolean isActive() {
+        return !isFinishing() && !isDestroyed();
     }
 }

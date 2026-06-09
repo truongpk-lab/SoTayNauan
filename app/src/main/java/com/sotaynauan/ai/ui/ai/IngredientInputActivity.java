@@ -8,8 +8,6 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Gravity;
@@ -30,6 +28,7 @@ import com.sotaynauan.ai.data.remote.AiBackendRemoteDataSource;
 import com.sotaynauan.ai.data.repository.AiChefRepository;
 
 import com.sotaynauan.ai.BuildConfig;
+import com.sotaynauan.ai.util.AppExecutors;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -52,7 +51,6 @@ public class IngredientInputActivity extends Activity {
     private static final int COLOR_PANEL = Color.parseColor("#FFFFFF");
     private static final int COLOR_SOFT = Color.parseColor("#FFF1EC");
     private static final int COLOR_SELECTED = Color.parseColor("#FFE084");
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private IngredientInputViewModel viewModel;
     private AiBackendRemoteDataSource aiBackendRemoteDataSource;
@@ -68,6 +66,7 @@ public class IngredientInputActivity extends Activity {
     private TextView emptyText;
     private TextView searchResultLabel;
     private Button ctaButton;
+    private Button cameraScanButton;
     private boolean detectingIngredients;
     private int activeCategoryIndex;
     private List<IngredientCategory> ingredientCategories;
@@ -97,6 +96,7 @@ public class IngredientInputActivity extends Activity {
         emptyText = findViewById(R.id.emptyIngredientState);
         searchResultLabel = findViewById(R.id.searchResultLabel);
         ctaButton = findViewById(R.id.findRecipesButton);
+        cameraScanButton = findViewById(R.id.cameraScanButton);
 
         findViewById(R.id.backButton).setOnClickListener(view -> finish());
         findViewById(R.id.addIngredientButton).setOnClickListener(view -> addTypedIngredient());
@@ -125,8 +125,7 @@ public class IngredientInputActivity extends Activity {
                 // No-op.
             }
         });
-        findViewById(R.id.cameraScanButton).setOnClickListener(view ->
-                openCameraForIngredientDetection());
+        cameraScanButton.setOnClickListener(view -> openCameraForIngredientDetection());
         ctaButton.setOnClickListener(view -> continueToSuggestions());
 
         bindQuickPacks();
@@ -137,7 +136,7 @@ public class IngredientInputActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        if (viewModel != null && !detectingIngredients) {
+        if (isActive() && viewModel != null && !detectingIngredients) {
             bindState(viewModel.loadState());
         }
     }
@@ -148,6 +147,9 @@ public class IngredientInputActivity extends Activity {
         if (requestCode != REQUEST_CAPTURE_INGREDIENTS || resultCode != RESULT_OK) {
             return;
         }
+        if (!isActive() || detectingIngredients) {
+            return;
+        }
         String imagePath = data == null
                 ? null
                 : data.getStringExtra(IngredientCameraActivity.EXTRA_IMAGE_PATH);
@@ -155,18 +157,7 @@ public class IngredientInputActivity extends Activity {
             statusText.setText("Không lấy được ảnh từ camera.");
             return;
         }
-        try {
-            File imageFile = new File(imagePath);
-            byte[] imageBytes;
-            try {
-                imageBytes = scaledJpegBytes(imageFile);
-            } finally {
-                deleteTempImage(imageFile);
-            }
-            detectIngredientsFromCamera(imageBytes);
-        } catch (IOException exception) {
-            statusText.setText("Không đọc được ảnh từ camera: " + exception.getMessage());
-        }
+        detectIngredientsFromCamera(imagePath);
     }
 
     private void addTypedIngredient() {
@@ -177,39 +168,58 @@ public class IngredientInputActivity extends Activity {
     }
 
     private void openCameraForIngredientDetection() {
+        if (detectingIngredients) {
+            statusText.setText("Đang nhận diện ảnh trước đó, chờ mình một chút nhé.");
+            return;
+        }
         Intent intent = new Intent(this, IngredientCameraActivity.class);
         statusText.setText("Đang mở camera trên thiết bị để chụp nguyên liệu.");
         startActivityForResult(intent, REQUEST_CAPTURE_INGREDIENTS);
     }
 
-    private void detectIngredientsFromCamera(byte[] imageBytes) {
-        detectingIngredients = true;
+    private void detectIngredientsFromCamera(String imagePath) {
+        setDetectingIngredients(true);
         statusText.setText("Đã chụp ảnh. Đang gửi backend YOLO nhận diện nguyên liệu...");
-        ctaButton.setEnabled(false);
-        new Thread(() -> {
+        AppExecutors.runOnIo(() -> {
             try {
+                File imageFile = new File(imagePath);
+                byte[] imageBytes;
+                try {
+                    imageBytes = scaledJpegBytes(imageFile);
+                } finally {
+                    deleteTempImage(imageFile);
+                }
                 List<DetectedIngredient> ingredients = aiBackendRemoteDataSource.detectIngredientsFromImage(
                         imageBytes, "image/jpeg");
-                mainHandler.post(() -> addDetectedIngredients(ingredients));
+                if (!isActive()) {
+                    return;
+                }
+                runOnUiThread(() -> addDetectedIngredients(ingredients));
             } catch (Exception exception) {
-                mainHandler.post(() -> {
-                    detectingIngredients = false;
+                if (!isActive()) {
+                    return;
+                }
+                runOnUiThread(() -> {
+                    setDetectingIngredients(false);
                     bindState(viewModel.loadState());
                     statusText.setText("Không gọi được backend YOLO: " + exception.getMessage());
                 });
             }
-        }).start();
+        });
     }
 
     private void addDetectedIngredients(List<DetectedIngredient> ingredients) {
+        if (!isActive()) {
+            return;
+        }
         if (ingredients == null || ingredients.isEmpty()) {
-            detectingIngredients = false;
+            setDetectingIngredients(false);
             bindState(viewModel.loadState());
             statusText.setText("Backend chưa nhận diện được nguyên liệu nào từ ảnh.");
             return;
         }
         IngredientInputState state = viewModel.addDetectedIngredients(ingredients);
-        detectingIngredients = false;
+        setDetectingIngredients(false);
         bindState(state);
         statusText.setText("Đã thêm " + ingredients.size()
                 + " nguyên liệu nhận diện từ camera thật. Kiểm tra số lượng ở bước xác nhận.");
@@ -299,6 +309,9 @@ public class IngredientInputActivity extends Activity {
     }
 
     private void bindState(IngredientInputState state) {
+        if (!isActive()) {
+            return;
+        }
         adapter.bindBasket(basketContainer, state.getIngredients(),
                 ingredient -> bindState(viewModel.removeIngredient(ingredient)));
         countText.setText(state.getCount() + " món");
@@ -310,9 +323,24 @@ public class IngredientInputActivity extends Activity {
 
     private void updateCtaState(IngredientInputState state) {
         boolean hasTypedIngredient = !input.getText().toString().trim().isEmpty();
-        boolean canSuggest = state.getCount() > 0 || hasTypedIngredient;
+        boolean canSuggest = !detectingIngredients && (state.getCount() > 0 || hasTypedIngredient);
         ctaButton.setEnabled(canSuggest);
         ctaButton.setAlpha(canSuggest ? 1f : 0.55f);
+    }
+
+    private void setDetectingIngredients(boolean detecting) {
+        detectingIngredients = detecting;
+        if (cameraScanButton != null) {
+            cameraScanButton.setEnabled(!detecting);
+            cameraScanButton.setAlpha(detecting ? 0.65f : 1f);
+        }
+        if (ctaButton != null) {
+            updateCtaState(viewModel.loadState());
+        }
+    }
+
+    private boolean isActive() {
+        return !isFinishing() && !isDestroyed();
     }
 
     private void bindIngredientPickers(IngredientInputState state) {
